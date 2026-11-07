@@ -12,3 +12,8 @@ RED: test_ai could not import OpenAIBackend. GREEN: 4 tests passed including
 request/output limits, safe errors and missing credentials. Official openai-python
 README consulted; requests use Responses, store=false, bounded input, timeout/retry.
 REFACTOR: formatted; regression 4 passed. Live paid API not exercised.
+
+## 3 — Persistence
+RED: missing storage module. GREEN: 6 passed, including window close/reopen,
+project isolation, goals and conversation ordering. SQLite transactions, foreign keys,
+WAL and private database permissions. REFACTOR: formatted; regression 6 passed.

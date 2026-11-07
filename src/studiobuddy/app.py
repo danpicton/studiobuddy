@@ -11,15 +11,29 @@ from PySide6.QtWidgets import (
 )
 from .ai import MockAI, OpenAIBackend, AIError
 from .runner import Runner
+from .storage import Store
 
 
 class Window(QMainWindow):
-    def __init__(self, ai=None):
+    def __init__(self, ai=None, store=None):
         super().__init__()
         self.setWindowTitle("Studio Buddy")
         self.resize(540, 680)
         self.ai = ai or MockAI()
-        self.messages = []
+        self.store = store or Store()
+        projects = self.store.projects()
+        self.project_id = int(
+            self.store.state("project")
+            or (projects[0]["id"] if projects else self.store.project("First ideas"))
+        )
+        sessions = self.store.sessions(self.project_id)
+        self.session_id = int(
+            self.store.state("session")
+            or (sessions[0]["id"] if sessions else self.store.session(self.project_id))
+        )
+        self.store.state("project", self.project_id)
+        self.store.state("session", self.session_id)
+        self.messages = self.store.messages(self.session_id)
         self.token = 0
         self.pending = None
         self.runner = Runner()
@@ -41,6 +55,7 @@ class Window(QMainWindow):
         self.layout.addWidget(self.send)
         self.status = QLabel("Ready")
         self.layout.addWidget(self.status)
+        self.render()
 
     def render(self):
         self.history.setPlainText(
@@ -57,6 +72,7 @@ class Window(QMainWindow):
         if not text:
             return
         self.cancel()
+        self.store.message(self.session_id, "user", text)
         self.messages.append({"role": "user", "content": text})
         self.input.clear()
         self.render()
@@ -78,6 +94,7 @@ class Window(QMainWindow):
                 else "Couldn't get a reply. Check your connection and settings."
             )
             return
+        self.store.message(self.session_id, "assistant", result["text"])
         self.messages.append({"role": "assistant", "content": result["text"]})
         self.render()
         self.status.setText(f"Ready · {result['tokens']} tokens")
@@ -85,12 +102,20 @@ class Window(QMainWindow):
     def closeEvent(self, event):
         self.cancel()
         self.runner.close()
+        self.store.close()
         event.accept()
 
 
 def main():
     app = QApplication(sys.argv)
     app.setApplicationName("studio-buddy")
-    window = Window(ai=MockAI() if "--mock" in sys.argv else OpenAIBackend())
+    import os
+    from pathlib import Path
+
+    data = Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local/share")) / "studio-buddy"
+    window = Window(
+        ai=MockAI() if "--mock" in sys.argv else OpenAIBackend(),
+        store=Store(data / "memory.sqlite"),
+    )
     window.show()
     sys.exit(app.exec())
