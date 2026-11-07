@@ -342,3 +342,28 @@ selection remains API-only while the subscription adapter uses its model default
 Preserved both development histories and replaced obsolete sttd integration notes.
 Validation after conflict resolution: 119 tests passed; Ruff and git diff --check
 passed. No microphone capture, paid API calls or live login; hardware checks unchanged.
+
+## ElevenLabs rejection diagnostics
+RED: `QT_QPA_PLATFORM=offscreen uv run pytest tests/test_cloud_voice.py -q`
+produced 14 expected failures and 6 passes: rejected requests discard HTTP status
+and provider error codes, and connection failures emit no diagnostic context.
+The initial sandbox run could not access uv's cache; the authorized rerun above
+executed the tests. All requests use MockTransport and fake keys.
+Checked ElevenLabs' official create-speech and error reference on 2026-11-07:
+the existing endpoint, model_id=eleven_multilingual_v2 and MP3 format match the
+documented contract. Errors expose detail.code (or legacy detail.status) and
+detail.request_id. No live account or voice entitlement has been checked.
+GREEN: focused cloud voice tests passed (20 tests). Diagnostics report safe error
+codes and request IDs plus selected voice/model/stability, without raw messages,
+headers, credentials or spoken text. UI errors now retain HTTP status and code.
+REFACTOR review: token filtering and bounded error parsing are centralized;
+the Hume path and existing cancellation/fallback handling remain unchanged.
+Additional passing regressions cover sensitive settings, interrupted error bodies,
+and stopping/closing error streams after the 16 KiB diagnostic limit.
+Regression: `QT_QPA_PLATFORM=offscreen uv run pytest` passed 135 tests, with one
+optional MCP transport test skipped; `uv run ruff check` passed. Both required
+cache access outside the sandbox. `git diff --check` passed.
+Manual checks still required: reload the updated app on Arch/Sway, reproduce with
+Test Voice and inspect stderr or the Studio Buddy service journal; this uses paid
+ElevenLabs generation and actual audio output. No paid calls, microphone capture,
+hardware tests or live voice/key checks were run, and PushTalk was untouched.

@@ -129,6 +129,24 @@ copy an available voice ID from your ElevenLabs voice library into **Eleven voic
 The model defaults to `eleven_multilingual_v2`; stability is configurable from 0 to 1.
 Uses the official `/v1/text-to-speech/{voice_id}` endpoint and MP3 audio.
 
+Rejected requests show the HTTP status and ElevenLabs error code in the UI.
+Warning logs include the selected voice ID, model ID, stability, HTTP status,
+error code and request ID (when supplied). Connection failures log the exception
+type. Logs go to stderr by default: launch from a terminal, or for the supplied
+background service use:
+
+```sh
+journalctl --user -u studio-buddy.service -f
+```
+
+Use **Test Voice** to reproduce the failure (this makes a paid API request and
+plays audio). A valid key can still lack voice/model access or available credits;
+use the returned code to distinguish these from invalid settings. See ElevenLabs'
+[error reference](https://elevenlabs.io/docs/eleven-api/resources/errors).
+API keys, spoken text, raw response messages and request headers are excluded from
+these diagnostics. Malformed, oversized or unsafe error fields fall back to
+`unknown`; the HTTP status is still reported. No global HTTP debug logging is needed.
+
 ### Hume
 
 Set `HUME_API_KEY`; choose **hume** and an available voice ID from your Hume Voice
