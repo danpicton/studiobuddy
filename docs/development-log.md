@@ -103,3 +103,12 @@ GREEN / regression: 34 tests passed; `uv run ruff check` passed. Removed the ful
 Qt metapackage and its Addons/WebEngine/PDF closure. During migration, uninstalling
 the metapackage removed a shared PySide6 file; reinstalling Essentials repaired it.
 No further refactor was needed. Live Arch/Sway/audio checks remain unrun.
+
+## Review fix 2 — Optional Renoise dependencies
+RED: dependency tests produced two expected failures: the default install includes
+MCP's server/auth stack, and desktop startup fails when MCP cannot be imported.
+GREEN / regression: default install 35 passed, 1 MCP transport test skipped;
+Renoise extra installed: 36 passed. Ruff initially caught a missing explicit
+subprocess check argument in the new test; fixed and rerun successfully. REFACTOR:
+lazy SDK imports stay inside the adapter; safe adapter errors reach the UI.
+CI now covers both installation modes. Live Renoise compatibility remains untested.

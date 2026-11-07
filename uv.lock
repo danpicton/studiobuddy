@@ -1030,9 +1030,13 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "httpx" },
-    { name = "mcp" },
     { name = "openai" },
     { name = "pyside6-essentials" },
+]
+
+[package.optional-dependencies]
+renoise = [
+    { name = "mcp" },
 ]
 
 [package.dev-dependencies]
@@ -1046,10 +1050,11 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "httpx", specifier = ">=0.28,<1" },
-    { name = "mcp", specifier = ">=1.20,<2" },
+    { name = "mcp", marker = "extra == 'renoise'", specifier = ">=1.20,<2" },
     { name = "openai", specifier = ">=2,<3" },
     { name = "pyside6-essentials", specifier = ">=6.8,<7" },
 ]
+provides-extras = ["renoise"]
 
 [package.metadata.requires-dev]
 dev = [

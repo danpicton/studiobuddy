@@ -5,8 +5,6 @@ from datetime import timedelta
 from urllib.parse import urlsplit
 
 import httpx
-from mcp import ClientSession
-from mcp.client.streamable_http import streamable_http_client
 
 
 class ContextError(Exception):
@@ -40,6 +38,14 @@ class Renoise:
         return "\n".join(c.text for c in result.contents if hasattr(c, "text"))[:8000]
 
     async def fetch(self, uri=None):
+        try:
+            from mcp import ClientSession
+            from mcp.client.streamable_http import streamable_http_client
+        except ImportError:
+            raise ContextError(
+                "Install Renoise support with uv tool install --reinstall '.[renoise]'"
+                " from the checkout (development: uv sync --extra renoise)."
+            ) from None
         try:
             async with asyncio.timeout(8):
                 async with (

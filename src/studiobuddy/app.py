@@ -19,7 +19,7 @@ from PySide6.QtWidgets import (
 
 from .ai import AIError, MockAI, OpenAIBackend
 from .memory_ui import NotesDialog
-from .renoise import Renoise
+from .renoise import ContextError, Renoise
 from .runner import Runner
 from .settings import Settings, config_path
 from .settings_ui import SettingsDialog
@@ -258,7 +258,9 @@ class Window(QMainWindow):
             return
         if error:
             self.renoise_context = ""
-            self.context_status.setText("Renoise · unavailable")
+            self.context_status.setText(
+                str(error) if isinstance(error, ContextError) else "Renoise · unavailable"
+            )
         elif isinstance(result, list):
             self.resources.clear()
             for uri, name in result:

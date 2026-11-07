@@ -149,6 +149,10 @@ the tool page was blocked by the build environment's network policy. The accessi
 `zakhap/renoise-mcp` project documents write/evaluate-Lua tools, which this app refuses
 to invoke. Do not assume it is the same project or substitute it for a resource server.
 
+Renoise support is an optional installation extra. From the checkout, run
+`uv tool install --reinstall '.[renoise]'` (development: `uv sync --extra renoise`).
+The default installation omits MCP and its server/authentication dependencies.
+
 This release implements the official MCP **Streamable HTTP resource** interface only.
 If your server publishes read-only song/note resources, enable MCP in Settings and
 enter its documented local HTTP endpoint, then Connect. `http://127.0.0.1:8000/mcp`

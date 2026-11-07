@@ -38,5 +38,6 @@ def test_remote_and_credential_urls_rejected():
 
 
 async def test_unavailable_is_bounded():
+    pytest.importorskip("mcp")
     with pytest.raises(ContextError, match="unavailable"):
         await Renoise("http://127.0.0.1:1/mcp").fetch()
