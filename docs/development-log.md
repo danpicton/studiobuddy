@@ -134,3 +134,10 @@ errors and atomic credential writes; file locking serializes rotating refresh to
 Regression: 45 passed, 1 optional MCP transport test skipped; Ruff passed.
 PyJWT with cryptography is now an intentional runtime dependency for verifying ID
 signatures; MCP/server dependencies remain optional. No real login was attempted.
+
+## Subscription slice 2 — Text-only plan inference
+RED: subscription inference tests fail collection because `chatgpt_ai` is absent.
+GREEN: 6 inference tests passed with fake SSE streams: OAuth-only requests, explicit
+terminal completion, failures after partial output, cancellation and no API fallback.
+REFACTOR: dedicated subscription adapter preserves the existing request-limit
+interface. Regression: 51 passed, 1 optional MCP test skipped; Ruff passed.
