@@ -60,3 +60,19 @@ async def test_hume_auth_failure(monkeypatch):
         await Hume("v", transport=httpx.MockTransport(lambda r: httpx.Response(401))).generate(
             "hello"
         )
+
+
+@pytest.mark.parametrize("provider", ["elevenlabs", "hume"])
+async def test_cloud_timeout_is_safe(provider, monkeypatch):
+    from studiobuddy.providers import Hume
+
+    monkeypatch.setenv("ELEVENLABS_API_KEY", "test")
+    monkeypatch.setenv("HUME_API_KEY", "test")
+
+    def handle(request):
+        raise httpx.ConnectTimeout("sensitive remote details")
+
+    cls = ElevenLabs if provider == "elevenlabs" else Hume
+    with pytest.raises(SpeechError, match="timed out") as error:
+        await cls("voice", transport=httpx.MockTransport(handle)).generate("hello")
+    assert "sensitive" not in str(error.value)

@@ -85,3 +85,12 @@ rendering, and shut down cleanly. CI matrix for Python 3.11/3.12 is configured b
 remote CI has not been observed. Documentation covers install, credential setup,
 provider differences, PushTalk independence, Sway and live verification gaps.
 GitHub API probe returned Forbidden; native Git publication is tested separately.
+
+## Final regression and publication evidence
+33 tests passed after adding checks for voice-failure recovery in the real window,
+persistent request limits across restart, and safe timeouts for both cloud voices.
+These additional regression tests passed without production changes. Branch
+feat/studio-buddy-mvp was successfully pushed using existing platform Git access.
+Environment status still reports revision 1 with no custom domains applied; the
+saved network draft has not changed runtime access. GitHub API access remains blocked.
+Reusable uv install/start instructions were saved in the environment draft.

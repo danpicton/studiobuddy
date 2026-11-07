@@ -68,3 +68,51 @@ def test_context_snapshot_consumed_once(qtbot):
     window.send_message()
     qtbot.waitUntil(lambda: len(window.messages) == 4)
     assert "Observed tempo 120" not in ai.reply.call_args.args[1]
+
+
+def test_voice_failure_preserves_text_and_chat_recovers(qtbot):
+    from studiobuddy.speech import SpeechError
+
+    class BrokenVoice:
+        async def generate(self, text):
+            raise SpeechError("Missing voice model")
+
+    window = Window()
+    qtbot.addWidget(window)
+    window.speech_runner.submit(0, window.speech.configure(True, BrokenVoice())).result(timeout=2)
+    window.input.setPlainText("Keep the bass")
+    window.send_message()
+    qtbot.waitUntil(lambda: "Missing voice model" in window.status.text())
+    assert len(window.messages) == 2
+    assert "strip the drums" in window.history.toPlainText()
+    window.set_voice_mode(False)
+    window.input.setPlainText("Try a different drum part")
+    window.send_message()
+    qtbot.waitUntil(lambda: len(window.messages) == 4)
+
+
+def test_request_limit_survives_restart(qtbot, tmp_path):
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock
+
+    from studiobuddy.ai import OpenAIBackend
+    from studiobuddy.settings import Settings
+    from studiobuddy.storage import Store
+
+    create = AsyncMock(return_value=SimpleNamespace(output_text="Keep the bass.", usage=None))
+    client = SimpleNamespace(responses=SimpleNamespace(create=create))
+    db = tmp_path / "db"
+    config = tmp_path / "config.toml"
+    Settings(request_limit=1).save(config)
+    first = Window(ai=OpenAIBackend(client=client), store=Store(db), settings_path=config)
+    qtbot.addWidget(first)
+    first.input.setPlainText("One request")
+    first.send_message()
+    qtbot.waitUntil(lambda: len(first.messages) == 2)
+    first.close()
+    second = Window(ai=OpenAIBackend(client=client), store=Store(db), settings_path=config)
+    qtbot.addWidget(second)
+    second.input.setPlainText("Second request")
+    second.send_message()
+    assert "limit reached" in second.status.text()
+    assert create.await_count == 1
