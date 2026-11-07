@@ -9,7 +9,7 @@ Use a disposable musical session. No project edits should occur.
    Start the separate studio-buddy services and verify F10 while Renoise has focus:
    automatic submit, spoken answer, notifications, show/hide, close-to-background,
    unchanged editor draft. Check simultaneous mic access and resource usage. Rapid
-   repeat F10 while transcribing must refuse overlap; switch sessions during capture
+   repeat F10 while transcribing must discard superseded transcripts; switch sessions during capture
    and confirm stale transcript is rejected. Migrate the F10 bindings to `nop`
    and install the voice listener unit.
    Delay a start worker, release immediately and confirm capture stays off.
@@ -19,10 +19,14 @@ Use a disposable musical session. No project edits should occur.
    Test cancel, lost-release watchdog, no
    speech, service restart and unavailable STT. Verify the chosen PipeWire mic.
    No microphone capture was run during development.
-3. OpenAI: with your own API billing/key, send one message, verify answer and token
-   count. Select a supported reasoning model/effort, increase output budget if needed,
-   verify a reply and persistence after restart. Default effort with gpt-4.1-mini
-   must keep working. Try wrong key / exhausted quota only in an isolated launch, confirm safe error.
+3. ChatGPT: run the normal app, Continue with ChatGPT, approve plan usage, select
+   a discovered model and send one message. Verify account label, reply and token
+   count, restart persistence, refresh after token expiry, Cancel sign-in and Sign out.
+   Verify the default browser returns to the loopback callback on Arch/Sway. Check
+   Manage usage; confirm plan-limit failures never switch to API billing. Actual
+   account eligibility and inference remain unverified until this check succeeds.
+   Optional API mode: explicitly select api with your own API key/billing and test.
+   In API mode also verify supported reasoning effort and persistence after restart.
 4. Piper: install a licensed model + JSON, select it, Test Voice; verify normal audio
    output. While generating/playing press Stop, send another message and switch to Text.
    Old speech must never begin/resume. Remove model temporarily and verify text survives.

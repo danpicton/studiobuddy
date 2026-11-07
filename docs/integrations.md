@@ -26,52 +26,44 @@ All network workers run outside Qt's UI thread. OpenAI never receives a tools sc
 No key values are written in errors, config or logs. MCP resource text stays in the
 user context channel and is explicitly marked untrusted, bounded and single-request.
 
-## Dedicated PushTalk integration
-Inspected https://github.com/danpicton/pushtalk main: existing `sttd --type-cmd`
-sends UTF-8 transcript bytes on stdin; `sttctl --socket` controls an independent
-instance. No upstream modifications. Dedicated sockets/state avoid F9 conflicts.
-The dedicated instance uses small.en/CPU/int8, four threads, no pre-roll; model
-download cache is shared, model RAM and mic streams are separate. No paid STT.
-Studio Buddy's private local socket uses bounded newline JSON and a lock file;
-no TCP listener, focus injection, model tools or automatic memory writes.
+## Dedicated speech integration
 
-The persistent `studio-buddy-voice listen-sway` process subscribes to Sway's
-ordered `binding` IPC events using `swaymsg -r -m`. Inspected upstream
-[swaymsg source](https://github.com/swaywm/sway/blob/master/swaymsg/main.c):
-raw monitored events are one JSON object per line, flushed after each event. The supplied `nop` bindings
-carry actions directly in that stream; they do not spawn independent key-command
-processes. The listener assigns a unique identity and registers intent synchronously
-before dispatching any blocking work. The causal guarantee is stream order, not
-UUID order or process scheduling. Standalone CLI `start` is rejected. Events not
-observed before subscription are never inferred; startup/disconnect/shutdown revoke
-old intent and require a fresh press. A lock prevents duplicate listeners. The unit
-also cancels in ExecStopPost, covering crashes/SIGKILL when Python cleanup cannot run.
+Studio Buddy uses its own token-aware `studio-buddy-stt` backend with the same
+faster-whisper / CTranslate2 / sounddevice stack as PushTalk: small.en, CPU int8,
+four threads, no pre-roll. PushTalk and F9 are independent. Model download cache
+is shared; runtime model memory and microphone streams are separate.
 
-Two stable lock files in the private runtime directory have separate responsibilities.
-`voice-control.lock` serializes STT operations; `voice-state.lock` protects intent,
-recording identity and cancellation revision in atomically replaced `voice-state.json`.
-An interrupted write leaves the previous state usable for crash cleanup.
-State transactions contain no socket
-or STT waits. Release revokes pending starts; cancel also revokes transcript acceptance
-before either IPC operation. GUI cancellation and recorder cancellation run independently,
-so a hung/unavailable GUI cannot prevent the recorder attempt and a slow recorder
-cannot leave transcripts eligible. GUI start/submit requests carry recording identity;
-GUI cancel carries revision so an old callback cannot cancel a newer recording.
-The GUI uses a nonblocking state lock and rejects a command if that lock is busy.
-Acceptance and cancellation linearize under that lock: an already-accepted transcript
-cannot be retroactively unsent; any submit after revocation is rejected before SQLite/AI.
+A persistent listener receives ordered Sway binding events and records each intent
+before worker dispatch. Capture seals audio and recording identity atomically;
+transcription carries that immutable identity through GUI acceptance. Stop/cancel
+are scoped to the originating generation. Cancellation revokes acceptance before
+GUI/recorder IPC; GUI cancellation and recorder cancellation proceed independently.
+Release cannot supersede a pending GUI cancellation. Startup, disconnect and
+shutdown revoke old intent and require a fresh press. The GUI checks identity and
+session under a short state lock before SQLite/AI submission; already accepted text
+cannot be retroactively unsent. See README for the required listener/backend units
+and migration from the obsolete dedicated sttd service.
 
-Unmodified PushTalk's worker keeps `pending` nonzero until its synchronous type-command
-subprocess exits (including timeout/kill). Status therefore remains `transcribing`
-until callbacks drain; Studio Buddy requires `idle` before assigning a new recording.
-The callback snapshots the recording identity before GUI IPC, so a delayed socket
-message cannot attach to a later recording. This integration depends on that upstream
-status/type-command contract and exclusive use of Studio Buddy's dedicated daemon;
-do not send it unrelated `sttctl start` commands. No PushTalk file or F9 binding changes.
+Local sockets and runtime state are private, payloads/queues bounded, and capture
+is capped at 120 seconds of samples. Native inference already in progress may finish,
+but cancelled output is discarded. Live Sway, systemd and microphone verification
+is still required. Never remove lock files while clients are running.
 
-STT IPC remains bounded by its six-second subprocess timeout. An in-flight STT start
-is serialized before a later stop/cancel; cancellation cannot promise a responsive
-microphone daemon when that daemon itself is hung. Missed releases without a detected
-stream failure remain bounded by PushTalk's configured 120-second watchdog. Live
-Sway delivery, service lifecycle and microphone behavior still require hardware checks.
-Never remove lock files while clients are running.
+## ChatGPT plan integration (2026-11-07)
+
+Studio Buddy uses the official direct local-app flow, not Codex app-server or
+private ChatGPT endpoints:
+
+- https://developers.openai.com/siwc/token-sharing-open-source/sign-in
+- https://developers.openai.com/siwc/token-sharing-open-source/profiles-and-sessions
+- https://developers.openai.com/siwc/token-sharing-open-source/models-and-inference
+- https://developers.openai.com/siwc/token-sharing-open-source/preview-limitations
+
+OAuth uses PKCE/state/nonce and a temporary loopback listener. PyJWT/cryptography
+verifies identity signatures. Protected app-owned storage and a file lock support
+rotating refresh tokens. Responses use OAuth, explicit public API URLs, store=false,
+stream=true, no tools and no automatic API-key fallback. The model catalogue comes
+from the connected account. The subscription preview rejects max_output_tokens;
+the length setting is therefore only a prompt target in subscription mode.
+This personal app keeps one account registration. Account eligibility, browser
+round-trip and a real subscription reply require the user's live desktop check.

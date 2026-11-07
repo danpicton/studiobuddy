@@ -17,6 +17,8 @@ def config_path():
 
 @dataclass
 class Settings:
+    ai_mode: str = "chatgpt"
+    chatgpt_model: str = ""
     model: str = "gpt-4.1-mini"
     reasoning_effort: str = "default"
     request_limit: int = 100
@@ -46,7 +48,8 @@ class Settings:
             if not valid:
                 raise ValueError(f"Invalid type for {key}")
         if (
-            self.provider not in ("piper", "elevenlabs", "hume")
+            self.ai_mode not in ("chatgpt", "api")
+            or self.provider not in ("piper", "elevenlabs", "hume")
             or self.fallback not in ("text", "piper")
             or self.theme not in ("dark", "system")
         ):

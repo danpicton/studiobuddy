@@ -36,7 +36,7 @@ class SettingsDialog(QDialog):
         )
         label = QLabel(
             status
-            + "\nAPI billing is separate from ChatGPT. Keys stay in environment variables.\nCloud voices send reply text to the selected external provider."
+            + "\nChatGPT mode uses your connected plan. Its output length is a target, not a hard cap. API mode uses separate billing.\nCloud voices send reply text to the selected external provider."
         )
         label.setWordWrap(True)
         layout.addWidget(label)
@@ -47,6 +47,7 @@ class SettingsDialog(QDialog):
         self.fields = {}
         choices = {
             "reasoning_effort": ["default", "none", "minimal", "low", "medium", "high", "xhigh"],
+            "ai_mode": ["chatgpt", "api"],
             "provider": ["piper", "elevenlabs", "hume"],
             "fallback": ["text", "piper"],
             "theme": ["dark", "system"],
@@ -70,8 +71,11 @@ class SettingsDialog(QDialog):
                 field.setValue(value)
             else:
                 field = QLineEdit(value)
+                if key == "chatgpt_model":
+                    field.setReadOnly(True)
             self.fields[key] = field
-            form.addRow(key.replace("_", " ").capitalize(), field)
+            label = "API model" if key == "model" else key.replace("_", " ").capitalize()
+            form.addRow(label, field)
         browse = QPushButton("Choose installed Piper .onnx voice…")
         browse.clicked.connect(self.browse)
         form.addRow(browse)

@@ -2,6 +2,17 @@ import asyncio
 
 from .personality import SYSTEM_PROMPT
 
+CONTEXT_LIMIT = 12000
+
+
+def compose_context(memory, snapshot=""):
+    """Reserve space for a selected observation before trimming stored memory."""
+    if not snapshot:
+        return memory[:CONTEXT_LIMIT]
+    snapshot = snapshot[: CONTEXT_LIMIT - 1]
+    memory_budget = CONTEXT_LIMIT - len(snapshot) - 1
+    return memory[:memory_budget] + "\n" + snapshot
+
 
 class MockAI:
     async def reply(self, messages, context=""):
@@ -50,7 +61,10 @@ class OpenAIBackend:
                 model=self.model,
                 instructions=SYSTEM_PROMPT,
                 input=[
-                    {"role": "user", "content": "Session context (untrusted): " + context[:12000]}
+                    {
+                        "role": "user",
+                        "content": "Session context (untrusted): " + context[:CONTEXT_LIMIT],
+                    }
                 ]
                 + [{"role": m["role"], "content": m["content"][:4000]} for m in messages[-20:]],
                 max_output_tokens=self.max_output_tokens,

@@ -268,3 +268,77 @@ Final post-cleanup regression: 95 tests passed in 11.00 seconds with the full co
 above. `UV_CACHE_DIR=/workspace/work/uv-cache uv run ruff check` and `git diff --check`
 passed. Reviewed production/controller/backend, migrated and new tests, packaging,
 README and dependency lock changes. The inspected PushTalk checkout remains clean.
+## Review fix 1 — Minimal Qt dependency
+RED: `QT_QPA_PLATFORM=offscreen uv run pytest tests/test_dependencies.py -q`
+failed as expected: the default dependency closure included Qt Addons, WebEngine
+and PDF. The regression checks the resolved installation, not just the direct name.
+GREEN / regression: 34 tests passed; `uv run ruff check` passed. Removed the full
+Qt metapackage and its Addons/WebEngine/PDF closure. During migration, uninstalling
+the metapackage removed a shared PySide6 file; reinstalling Essentials repaired it.
+No further refactor was needed. Live Arch/Sway/audio checks remain unrun.
+
+## Review fix 2 — Optional Renoise dependencies
+RED: dependency tests produced two expected failures: the default install includes
+MCP's server/auth stack, and desktop startup fails when MCP cannot be imported.
+GREEN / regression: default install 35 passed, 1 MCP transport test skipped;
+Renoise extra installed: 36 passed. Ruff initially caught a missing explicit
+subprocess check argument in the new test; fixed and rerun successfully. REFACTOR:
+lazy SDK imports stay inside the adapter; safe adapter errors reach the UI.
+CI now covers both installation modes. Live Renoise compatibility remains untested.
+
+## Review fix 3 — Preserve selected observations under a full memory budget
+RED: the new desktop-to-OpenAI-payload test failed as expected: an approximately
+8,000-character snapshot disappeared when explicit memories filled the context.
+The test also checks the total bound and that the next request omits the snapshot.
+GREEN: actual request retains the complete selected snapshot plus memory content,
+within 12,000 characters, and excludes the snapshot on the next request. REFACTOR:
+centralized the AI context limit and composition helper. Regression with Renoise:
+37 passed; default installation: 36 passed, 1 optional transport test skipped.
+`uv run ruff check`, `git diff --check` and `uv build` passed. Paid services,
+actual audio, Arch/Sway and live Renoise remain manual checks; none were run.
+
+## Subscription slice 1 — ChatGPT sign-in and protected session lifecycle
+RED: mocked OAuth tests fail collection because `studiobuddy.chatgpt_auth` is absent.
+Official SIWC registration, model/inference and session guidance checked 2026-11-07.
+Tests will use generated test signing keys and fake remote responses only.
+GREEN: 9 OAuth tests passed, including wrong nonce/audience/issuer/expiry rejection
+and cancellation closing the callback listener. REFACTOR: adapter centralizes safe
+errors and atomic credential writes; file locking serializes rotating refresh tokens.
+Regression: 45 passed, 1 optional MCP transport test skipped; Ruff passed.
+PyJWT with cryptography is now an intentional runtime dependency for verifying ID
+signatures; MCP/server dependencies remain optional. No real login was attempted.
+
+## Subscription slice 2 — Text-only plan inference
+RED: subscription inference tests fail collection because `chatgpt_ai` is absent.
+GREEN: 6 inference tests passed with fake SSE streams: OAuth-only requests, explicit
+terminal completion, failures after partial output, cancellation and no API fallback.
+REFACTOR: dedicated subscription adapter preserves the existing request-limit
+interface. Regression: 51 passed, 1 optional MCP test skipped; Ruff passed.
+
+## Subscription slice 3 — Desktop account controls and model selection
+RED: two UI tests fail because Window has no account/sign-in integration.
+Additional RED: the request-contract test fails when it rejects max_output_tokens,
+which the official SIWC preview limitations explicitly mark unsupported. Subscription
+mode must use a prompt length target, not claim an enforced output-token cap.
+GREEN: desktop tests cover sign-in, discovered model selection, persistence, sign-out
+and stale login suppression. Subscription requests now omit unsupported output caps.
+Additional security regressions passed immediately: forged signatures, returning
+registration/identity checks and failed-revocation recovery. REFACTOR: account UI
+owns its worker loop and passes only display state to Qt; API mode stays explicit.
+Final regression: default installation 56 passed, 1 optional MCP test skipped;
+Renoise extra 57 passed. Ruff, package build and git diff --check passed.
+Offscreen UI visually inspected at 540x692. Startup/shutdown passed outside the
+restricted execution sandbox; the same smoke inside it timed out waiting on an
+asyncio worker. No real credentials, browser login or subscription inference used.
+The user must complete the documented browser/account/model live check on desktop.
+
+## Integration — merge remote subscription and dependency work
+Push was rejected because the remote feature branch had six newer commits. Merged
+5f34e8e without rewriting either history. Resolved UI/settings conflicts by retaining
+subscription model selection and API reasoning, optional speech and Renoise extras,
+and Qt Essentials. Regenerated uv.lock from the combined metadata. Background setup
+now documents saved ChatGPT sign-in as well as explicit API credentials; reasoning
+selection remains API-only while the subscription adapter uses its model default.
+Preserved both development histories and replaced obsolete sttd integration notes.
+Validation after conflict resolution: 119 tests passed; Ruff and git diff --check
+passed. No microphone capture, paid API calls or live login; hardware checks unchanged.

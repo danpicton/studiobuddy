@@ -1,6 +1,6 @@
 import sys
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -17,9 +17,12 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .ai import AIError, MockAI, OpenAIBackend
+from .account_ui import AccountPanel
+from .ai import AIError, MockAI, OpenAIBackend, compose_context
+from .chatgpt_ai import ChatGPTBackend
+from .chatgpt_auth import ChatGPTAuth
 from .memory_ui import NotesDialog
-from .renoise import Renoise
+from .renoise import ContextError, Renoise
 from .runner import Runner
 from .settings import Settings, config_path
 from .settings_ui import SettingsDialog
@@ -52,10 +55,13 @@ class MessageInput(QPlainTextEdit):
 
 
 class Window(QMainWindow):
-    def __init__(self, ai=None, store=None, settings_path=None):
+    def __init__(self, ai=None, store=None, settings_path=None, auth=None):
         super().__init__()
         self.setWindowTitle("Studio Buddy")
         self.resize(540, 680)
+        self.auth = auth
+        self.managed_backend = ai is None and auth is not None
+        self.account = None
         self.ai = ai or MockAI()
         self.settings_path = settings_path
         self.settings = Settings.load(settings_path) if settings_path else Settings()
@@ -170,7 +176,28 @@ class Window(QMainWindow):
         settings_button = QPushButton("Settings")
         settings_button.clicked.connect(self.open_settings)
         self.layout.addWidget(settings_button)
+        if self.auth:
+            self.account = AccountPanel(self.auth, self.settings.chatgpt_model, self)
+            self.account.changing.connect(self.cancel)
+            self.account.model_selected.connect(self.select_chatgpt_model)
+            self.layout.insertWidget(1, self.account)
         self.apply_settings(self.settings, save=False)
+        if self.account and self.settings.ai_mode == "chatgpt":
+            try:
+                connected = self.auth.account_label()
+            except (ValueError, OSError):
+                connected = False
+                self.account.status.setText("ChatGPT credential file could not be read.")
+            if connected:
+                QTimer.singleShot(0, lambda: self.account.start("refresh"))
+
+    def select_chatgpt_model(self, model):
+        self.cancel()
+        self.settings.chatgpt_model = model
+        if isinstance(self.ai, ChatGPTBackend):
+            self.ai.model = model
+        if self.settings_path:
+            self.settings.save(self.settings_path)
 
     def open_settings(self):
         SettingsDialog(
@@ -206,8 +233,16 @@ class Window(QMainWindow):
         self.renoise_context = ""
         self.resources.clear()
         self.settings = settings
+        if self.managed_backend:
+            self.ai = (
+                ChatGPTBackend(self.auth) if settings.ai_mode == "chatgpt" else OpenAIBackend()
+            )
+        if self.account:
+            self.account.setVisible(settings.ai_mode == "chatgpt")
         if isinstance(self.ai, OpenAIBackend):
-            self.ai.model = settings.model
+            self.ai.model = (
+                settings.chatgpt_model if isinstance(self.ai, ChatGPTBackend) else settings.model
+            )
             self.ai.reasoning_effort = settings.reasoning_effort
             self.ai.request_limit = settings.request_limit
             self.ai.max_output_tokens = settings.max_output_tokens
@@ -269,7 +304,9 @@ class Window(QMainWindow):
             return
         if error:
             self.renoise_context = ""
-            self.context_status.setText("Renoise · unavailable")
+            self.context_status.setText(
+                str(error) if isinstance(error, ContextError) else "Renoise · unavailable"
+            )
         elif isinstance(result, list):
             self.resources.clear()
             for uri, name in result:
@@ -411,7 +448,9 @@ class Window(QMainWindow):
             self.token,
             self.ai.reply(
                 list(self.messages),
-                self.store.context(self.project_id, self.session_id) + "\n" + self.renoise_context,
+                compose_context(
+                    self.store.context(self.project_id, self.session_id), self.renoise_context
+                ),
             ),
         )
         if self.renoise_context:
@@ -419,6 +458,8 @@ class Window(QMainWindow):
             self.context_status.setText("Renoise · snapshot used; read again to refresh")
 
     def cancel(self):
+        if self.account:
+            self.account.cancel()
         self.speech_runner.submit(0, self.speech.stop())
         self.token += 1
         if hasattr(self, "status"):
@@ -460,6 +501,8 @@ class Window(QMainWindow):
             return
         self.closed = True
         self.cancel()
+        if self.account:
+            self.account.shutdown()
         self.runner.close()
         self.speech_runner.close()
         self.context_runner.close()
@@ -491,7 +534,10 @@ def main():
         print("Cannot reach Studio Buddy. Check XDG_RUNTIME_DIR and the service.", file=sys.stderr)
         return 1
     window = Window(
-        ai=MockAI() if "--mock" in sys.argv else OpenAIBackend(),
+        ai=MockAI() if "--mock" in sys.argv else None,
+        auth=None
+        if "--mock" in sys.argv
+        else ChatGPTAuth(config_path().with_name("chatgpt-auth.json")),
         store=Store(data / "memory.sqlite"),
         settings_path=config_path(),
     )
