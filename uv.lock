@@ -1031,6 +1031,7 @@ source = { editable = "." }
 dependencies = [
     { name = "httpx" },
     { name = "openai" },
+    { name = "pyjwt", extra = ["crypto"] },
     { name = "pyside6-essentials" },
 ]
 
@@ -1052,6 +1053,7 @@ requires-dist = [
     { name = "httpx", specifier = ">=0.28,<1" },
     { name = "mcp", marker = "extra == 'renoise'", specifier = ">=1.20,<2" },
     { name = "openai", specifier = ">=2,<3" },
+    { name = "pyjwt", extras = ["crypto"], specifier = ">=2.10,<3" },
     { name = "pyside6-essentials", specifier = ">=6.8,<7" },
 ]
 provides-extras = ["renoise"]

@@ -123,3 +123,14 @@ centralized the AI context limit and composition helper. Regression with Renoise
 37 passed; default installation: 36 passed, 1 optional transport test skipped.
 `uv run ruff check`, `git diff --check` and `uv build` passed. Paid services,
 actual audio, Arch/Sway and live Renoise remain manual checks; none were run.
+
+## Subscription slice 1 — ChatGPT sign-in and protected session lifecycle
+RED: mocked OAuth tests fail collection because `studiobuddy.chatgpt_auth` is absent.
+Official SIWC registration, model/inference and session guidance checked 2026-11-07.
+Tests will use generated test signing keys and fake remote responses only.
+GREEN: 9 OAuth tests passed, including wrong nonce/audience/issuer/expiry rejection
+and cancellation closing the callback listener. REFACTOR: adapter centralizes safe
+errors and atomic credential writes; file locking serializes rotating refresh tokens.
+Regression: 45 passed, 1 optional MCP transport test skipped; Ruff passed.
+PyJWT with cryptography is now an intentional runtime dependency for verifying ID
+signatures; MCP/server dependencies remain optional. No real login was attempted.

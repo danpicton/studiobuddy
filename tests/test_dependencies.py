@@ -26,7 +26,7 @@ def test_desktop_does_not_install_unused_qt_components():
 
 def test_default_install_does_not_include_mcp_server_stack():
     assert runtime_dependencies().isdisjoint(
-        {"mcp", "starlette", "uvicorn", "python-multipart", "pyjwt", "cryptography"}
+        {"mcp", "starlette", "uvicorn", "python-multipart"}
     )
 
 
