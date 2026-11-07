@@ -9,7 +9,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QLabel,
 )
-from .ai import MockAI
+from .ai import MockAI, OpenAIBackend, AIError
 from .runner import Runner
 
 
@@ -72,7 +72,11 @@ class Window(QMainWindow):
         if token != self.token:
             return
         if error:
-            self.status.setText("Couldn't get a reply. Check your connection and settings.")
+            self.status.setText(
+                str(error)
+                if isinstance(error, AIError)
+                else "Couldn't get a reply. Check your connection and settings."
+            )
             return
         self.messages.append({"role": "assistant", "content": result["text"]})
         self.render()
@@ -87,6 +91,6 @@ class Window(QMainWindow):
 def main():
     app = QApplication(sys.argv)
     app.setApplicationName("studio-buddy")
-    window = Window()
+    window = Window(ai=MockAI() if "--mock" in sys.argv else OpenAIBackend())
     window.show()
     sys.exit(app.exec())
