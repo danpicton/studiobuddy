@@ -48,3 +48,10 @@ RED: Hume import failed (2 tests). GREEN: 16 passed. Verified distinct /v0/tts/f
 payload, voice ID, acting description, WAV format and authentication error handling.
 Source: official HumeAI/hume-python-sdk tts/raw_client.py and posted_utterance.py.
 REFACTOR: format; regression 16 passed. Live Hume/ElevenLabs calls not made.
+
+## 9 — Project memory and continuity
+RED: Store.notes and Window.create_project absent. GREEN: 18 passed. Added project/
+session selection, explicit categorized notes (including rejected experiments and
+outcomes), edit/delete, manual concise wrap-up/next-step, context across sessions,
+and coaching buttons. No automatic promotion of chat to memory. REFACTOR: notes
+editor separated from main window, formatting; regression 18 passed.

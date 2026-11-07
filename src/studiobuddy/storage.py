@@ -18,6 +18,7 @@ class Store:
         CREATE TABLE IF NOT EXISTS projects(id INTEGER PRIMARY KEY, name TEXT NOT NULL, xrns TEXT);
         CREATE TABLE IF NOT EXISTS sessions(id INTEGER PRIMARY KEY, project_id INTEGER REFERENCES projects(id), goal TEXT NOT NULL, summary TEXT DEFAULT '', next_step TEXT DEFAULT '');
         CREATE TABLE IF NOT EXISTS messages(id INTEGER PRIMARY KEY, session_id INTEGER REFERENCES sessions(id), role TEXT CHECK(role IN ('user','assistant')), content TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS notes(id INTEGER PRIMARY KEY, project_id INTEGER REFERENCES projects(id), kind TEXT NOT NULL, text TEXT NOT NULL, outcome TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS state(key TEXT PRIMARY KEY, value TEXT);
         """)
 
@@ -69,6 +70,62 @@ class Store:
     def update_goal(self, session, goal):
         with self.db:
             self.db.execute("UPDATE sessions SET goal=? WHERE id=?", (goal, session))
+
+    def notes(self, project):
+        return [
+            dict(r)
+            for r in self.db.execute(
+                "SELECT * FROM notes WHERE project_id=? ORDER BY id DESC", (project,)
+            )
+        ]
+
+    def remember(self, project, kind, text, outcome=""):
+        with self.db:
+            return self.db.execute(
+                "INSERT INTO notes(project_id,kind,text,outcome) VALUES(?,?,?,?)",
+                (project, kind, text, outcome),
+            ).lastrowid
+
+    def edit_note(self, note, kind, text, outcome):
+        with self.db:
+            self.db.execute(
+                "UPDATE notes SET kind=?,text=?,outcome=? WHERE id=?", (kind, text, outcome, note)
+            )
+
+    def delete_note(self, note):
+        with self.db:
+            self.db.execute("DELETE FROM notes WHERE id=?", (note,))
+
+    def summarize(self, session, summary, next_step):
+        with self.db:
+            self.db.execute(
+                "UPDATE sessions SET summary=?,next_step=? WHERE id=?",
+                (summary, next_step, session),
+            )
+
+    def context(self, project, session):
+        import json
+
+        current = dict(
+            self.db.execute(
+                "SELECT * FROM sessions WHERE id=? AND project_id=?", (session, project)
+            ).fetchone()
+        )
+        previous = [
+            dict(r)
+            for r in self.db.execute(
+                "SELECT goal,summary,next_step FROM sessions WHERE project_id=? AND id!=? ORDER BY id DESC LIMIT 3",
+                (project, session),
+            )
+        ]
+        return json.dumps(
+            {
+                "current_session": current,
+                "previous_sessions": previous,
+                "explicit_memories": self.notes(project)[:30],
+            },
+            ensure_ascii=False,
+        )[:12000]
 
     def close(self):
         self.db.close()
