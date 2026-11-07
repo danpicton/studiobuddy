@@ -55,3 +55,13 @@ session selection, explicit categorized notes (including rejected experiments an
 outcomes), edit/delete, manual concise wrap-up/next-step, context across sessions,
 and coaching buttons. No automatic promotion of chat to memory. REFACTOR: notes
 editor separated from main window, formatting; regression 18 passed.
+
+## 10 — Optional read-only MCP resources
+RED: renoise module absent. GREEN: 21 passed: advertised-resource allowlist,
+no tool calls, local endpoint restrictions and unavailable connection.
+Uses installed official MCP SDK Streamable HTTP resource interface. The requested
+renoise.com tool page is blocked by egress policy; a network draft was saved.
+GitHub zakhap/renoise-mcp documents write tools / evaluate_lua only; these are
+intentionally unsupported. Resource-only adapter is implemented, but compatibility
+with the user's ReMCP server and song/note resources remains unverified. No tool
+names or data capabilities invented. REFACTOR: format; regression 21 passed.

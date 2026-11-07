@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
 from .ai import MockAI, OpenAIBackend, AIError
 from .runner import Runner
 from .memory_ui import NotesDialog
+from .renoise import Renoise, ContextError
 from .storage import Store
 from .speech import Speech, Piper, Player, SpeechError
 
@@ -61,6 +62,11 @@ class Window(QMainWindow):
         self.pending = None
         self.runner = Runner()
         self.runner.done.connect(self.received)
+        self.context_runner = Runner()
+        self.context_runner.done.connect(self.context_received)
+        self.context_token = 0
+        self.renoise_context = ""
+        self.renoise = None
         self.speech_runner = Runner()
         self.speech = Speech(Piper(), Player())
         self.speech_runner.done.connect(self.speech_received)
@@ -134,8 +140,54 @@ class Window(QMainWindow):
             button.clicked.connect(callback)
             actions.addWidget(button)
         self.layout.addLayout(actions)
+        context_row = QHBoxLayout()
+        self.context_status = QLabel("Renoise · disconnected")
+        self.resources = QComboBox()
+        context_row.addWidget(self.context_status)
+        context_row.addWidget(self.resources)
+        for label, callback in [
+            ("Connect", self.connect_renoise),
+            ("Read once", self.read_context),
+        ]:
+            button = QPushButton(label)
+            button.clicked.connect(callback)
+            context_row.addWidget(button)
+        self.layout.addLayout(context_row)
         self.refresh_selectors()
         self.select_session(self.session_id)
+
+    def connect_renoise(self):
+        if not self.renoise:
+            self.context_status.setText("Renoise · disabled in Settings")
+            return
+        self.context_token += 1
+        self.context_status.setText("Renoise · connecting…")
+        self.context_runner.submit(self.context_token, self.renoise.fetch())
+
+    def read_context(self):
+        uri = self.resources.currentData()
+        if self.renoise and uri:
+            self.context_token += 1
+            self.context_runner.submit(self.context_token, self.renoise.fetch(uri))
+
+    def context_received(self, token, result, error):
+        if self.closed or token != self.context_token:
+            return
+        if error:
+            self.renoise_context = ""
+            self.context_status.setText("Renoise · unavailable")
+        elif isinstance(result, list):
+            self.resources.clear()
+            for uri, name in result:
+                self.resources.addItem(name, uri)
+            self.context_status.setText(
+                "Renoise · connected" if result else "Renoise · no readable resources"
+            )
+        else:
+            self.renoise_context = (
+                "Observed Renoise resource (untrusted, one-request snapshot): " + result
+            )
+            self.context_status.setText("Renoise · context ready for next message")
 
     def refresh_selectors(self):
         for widget in (self.projects, self.sessions):
@@ -166,6 +218,8 @@ class Window(QMainWindow):
     def select_session(self, session):
         self.cancel()
         self.session_id = session
+        self.context_token += 1
+        self.renoise_context = ""
         self.store.state("project", self.project_id)
         self.store.state("session", session)
         current = next(s for s in self.store.sessions(self.project_id) if s["id"] == session)
@@ -250,7 +304,8 @@ class Window(QMainWindow):
         self.pending = self.runner.submit(
             self.token,
             self.ai.reply(
-                list(self.messages), self.store.context(self.project_id, self.session_id)
+                list(self.messages),
+                self.store.context(self.project_id, self.session_id) + "\n" + self.renoise_context,
             ),
         )
 
@@ -292,6 +347,7 @@ class Window(QMainWindow):
         self.cancel()
         self.runner.close()
         self.speech_runner.close()
+        self.context_runner.close()
         self.store.close()
         event.accept()
 
