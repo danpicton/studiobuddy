@@ -29,3 +29,9 @@ RED: Ctrl+Enter submission timed out. Initial QShortcut did not handle the focus
 editor reliably in offscreen Qt; moved handling to the editor's key event.
 GREEN: 9 passed; REFACTOR: format, regression 9 passed. Native paste is verified;
 actual wtype/F9 remains an Arch/Sway smoke test. PushTalk was not modified.
+
+## 6 — Local speech and interruption
+RED: speech module absent. GREEN: 12 passed, including text silence and a cancelled
+provider deliberately returning stale audio. Generation fencing prevents playback.
+Piper CLI follows OHF-Voice/piper1-gpl documentation; ffplay subprocess is killed and
+reaped on cancellation. REFACTOR: format; regression 12 passed. Hardware untested.

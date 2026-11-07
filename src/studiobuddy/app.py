@@ -8,12 +8,14 @@ from PySide6.QtWidgets import (
     QTextBrowser,
     QPlainTextEdit,
     QPushButton,
+    QCheckBox,
     QLabel,
     QLineEdit,
 )
 from .ai import MockAI, OpenAIBackend, AIError
 from .runner import Runner
 from .storage import Store
+from .speech import Speech, Piper, Player, SpeechError
 
 
 class MessageInput(QPlainTextEdit):
@@ -55,6 +57,9 @@ class Window(QMainWindow):
         self.pending = None
         self.runner = Runner()
         self.runner.done.connect(self.received)
+        self.speech_runner = Runner()
+        self.speech = Speech(Piper(), Player())
+        self.speech_runner.done.connect(self.speech_received)
         body = QWidget()
         self.setCentralWidget(body)
         self.layout = QVBoxLayout(body)
@@ -77,6 +82,16 @@ class Window(QMainWindow):
         self.send.clicked.connect(self.send_message)
         self.input.submitted.connect(self.send_message)
         self.layout.addWidget(self.send)
+        self.voice = QCheckBox("Voice replies · Piper (local)")
+        self.voice.toggled.connect(
+            lambda enabled: self.speech_runner.submit(
+                0, self.speech.configure(enabled, self.speech.provider, self.speech.fallback)
+            )
+        )
+        self.layout.addWidget(self.voice)
+        self.stop = QPushButton("Stop / cancel")
+        self.stop.clicked.connect(self.cancel)
+        self.layout.addWidget(self.stop)
         self.status = QLabel("Ready")
         self.layout.addWidget(self.status)
         self.render()
@@ -106,6 +121,7 @@ class Window(QMainWindow):
         )
 
     def cancel(self):
+        self.speech_runner.submit(0, self.speech.stop())
         self.token += 1
         if self.pending:
             self.pending.cancel()
@@ -124,6 +140,15 @@ class Window(QMainWindow):
         self.messages.append({"role": "assistant", "content": result["text"]})
         self.render()
         self.status.setText(f"Ready · {result['tokens']} tokens")
+        self.speech_runner.submit(self.token, self.speech.say(result["text"]))
+
+    def speech_received(self, token, result, error):
+        if error and not self.closed and token in (0, self.token):
+            self.status.setText(
+                str(error)
+                if isinstance(error, SpeechError)
+                else "Speech unavailable; text is still here."
+            )
 
     def closeEvent(self, event):
         if self.closed:
@@ -132,6 +157,7 @@ class Window(QMainWindow):
         self.closed = True
         self.cancel()
         self.runner.close()
+        self.speech_runner.close()
         self.store.close()
         event.accept()
 
