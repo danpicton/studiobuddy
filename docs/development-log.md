@@ -17,3 +17,9 @@ REFACTOR: formatted; regression 4 passed. Live paid API not exercised.
 RED: missing storage module. GREEN: 6 passed, including window close/reopen,
 project isolation, goals and conversation ordering. SQLite transactions, foreign keys,
 WAL and private database permissions. REFACTOR: formatted; regression 6 passed.
+
+## 4 — Coaching
+RED: missing goal widget and insufficient personality instructions (2 failures).
+Initial GREEN run exposed repeated-close teardown errors; made shutdown idempotent.
+GREEN: 8 passed after correction. Editable goal persists; personality is a dedicated maintainable
+module, separate from untrusted session data. REFACTOR: format; regression 8 passed.

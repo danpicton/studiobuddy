@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (
     QPlainTextEdit,
     QPushButton,
     QLabel,
+    QLineEdit,
 )
 from .ai import MockAI, OpenAIBackend, AIError
 from .runner import Runner
@@ -35,6 +36,7 @@ class Window(QMainWindow):
         self.store.state("session", self.session_id)
         self.messages = self.store.messages(self.session_id)
         self.token = 0
+        self.closed = False
         self.pending = None
         self.runner = Runner()
         self.runner.done.connect(self.received)
@@ -42,6 +44,12 @@ class Window(QMainWindow):
         self.setCentralWidget(body)
         self.layout = QVBoxLayout(body)
         self.layout.addWidget(QLabel("STUDIO BUDDY · a little company for your next loop"))
+        self.goal = QLineEdit(self.store.sessions(self.project_id)[0]["goal"])
+        self.goal.setPlaceholderText("One creative goal for today")
+        self.goal.editingFinished.connect(
+            lambda: self.store.update_goal(self.session_id, self.goal.text())
+        )
+        self.layout.addWidget(self.goal)
         self.history = QTextBrowser()
         self.layout.addWidget(self.history)
         self.input = QPlainTextEdit()
@@ -77,7 +85,9 @@ class Window(QMainWindow):
         self.input.clear()
         self.render()
         self.status.setText("Thinking…")
-        self.pending = self.runner.submit(self.token, self.ai.reply(list(self.messages)))
+        self.pending = self.runner.submit(
+            self.token, self.ai.reply(list(self.messages), "Goal: " + self.goal.text())
+        )
 
     def cancel(self):
         self.token += 1
@@ -100,6 +110,10 @@ class Window(QMainWindow):
         self.status.setText(f"Ready · {result['tokens']} tokens")
 
     def closeEvent(self, event):
+        if self.closed:
+            event.accept()
+            return
+        self.closed = True
         self.cancel()
         self.runner.close()
         self.store.close()

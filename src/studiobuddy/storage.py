@@ -66,5 +66,9 @@ class Store:
         row = self.db.execute("SELECT value FROM state WHERE key=?", (key,)).fetchone()
         return row[0] if row else None
 
+    def update_goal(self, session, goal):
+        with self.db:
+            self.db.execute("UPDATE sessions SET goal=? WHERE id=?", (goal, session))
+
     def close(self):
         self.db.close()
