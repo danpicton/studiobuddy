@@ -1,9 +1,11 @@
 # Merge into your Sway config yourself; no F9 or existing PushTalk changes.
 # Import OPENAI_API_KEY through your own secure session/credential setup.
 exec systemctl --user import-environment WAYLAND_DISPLAY XDG_CURRENT_DESKTOP SWAYSOCK
-exec systemctl --user start studio-buddy.service studio-buddy-stt.service
+exec systemctl --user start studio-buddy.service studio-buddy-stt.service studio-buddy-voice.service
 
-bindsym --no-repeat F10 exec studio-buddy-voice start
-bindsym --release F10 exec studio-buddy-voice stop
+# The persistent listener consumes these ordered Sway binding events.
+# Do not replace them with independently spawned start/stop CLI processes.
+bindsym --no-repeat F10 nop studio-buddy:start
+bindsym --release F10 nop studio-buddy:stop
 bindsym $mod+F10 exec studio-buddy-voice show
-bindsym $mod+Shift+F10 exec studio-buddy-voice cancel
+bindsym $mod+Shift+F10 nop studio-buddy:cancel

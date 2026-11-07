@@ -1,0 +1,17 @@
+[Unit]
+Description=Studio Buddy ordered Sway voice key events
+Requires=studio-buddy.service studio-buddy-stt.service
+After=studio-buddy.service studio-buddy-stt.service
+PartOf=studio-buddy.service
+
+[Service]
+Type=exec
+Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin
+ExecStart=%h/.local/bin/studio-buddy-voice listen-sway
+# Also revoke/cancel after a crash or SIGKILL, when Python cannot run finally.
+ExecStopPost=-%h/.local/bin/studio-buddy-voice cancel
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=graphical-session.target

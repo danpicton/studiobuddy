@@ -10,7 +10,13 @@ Use a disposable musical session. No project edits should occur.
    automatic submit, spoken answer, notifications, show/hide, close-to-background,
    unchanged editor draft. Check simultaneous mic access and resource usage. Rapid
    repeat F10 while transcribing must refuse overlap; switch sessions during capture
-   and confirm stale transcript is rejected. Test cancel, lost-release watchdog, no
+   and confirm stale transcript is rejected. Migrate the F10 bindings to `nop`
+   and install the voice listener unit.
+   Delay a start worker, release immediately and confirm capture stays off.
+   Cancel during transcription and while the GUI is hung/unavailable; no old text
+   may submit or launch AI. Restart/kill the listener, disconnect Sway IPC and reload
+   Sway while holding F10; capture must cancel, and only a fresh press may re-arm.
+   Test cancel, lost-release watchdog, no
    speech, service restart and unavailable STT. Verify the chosen PipeWire mic.
    No microphone capture was run during development.
 3. OpenAI: with your own API billing/key, send one message, verify answer and token

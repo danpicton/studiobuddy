@@ -151,7 +151,7 @@ and install the supplied units:
 ```sh
 uv tool install --reinstall .
 mkdir -p ~/.config/systemd/user
-cp packaging/studio-buddy.service packaging/studio-buddy-stt.service ~/.config/systemd/user/
+cp packaging/studio-buddy*.service ~/.config/systemd/user/
 systemctl --user daemon-reload
 ```
 
@@ -163,22 +163,35 @@ and reload Sway, or start the units after importing the session environment:
 
 ```sh
 systemctl --user import-environment WAYLAND_DISPLAY XDG_CURRENT_DESKTOP SWAYSOCK
-systemctl --user start studio-buddy.service studio-buddy-stt.service
+systemctl --user start studio-buddy.service studio-buddy-stt.service studio-buddy-voice.service
 ```
 
 Bindings provided for you to merge yourself:
 
 ```sway
-bindsym --no-repeat F10 exec studio-buddy-voice start
-bindsym --release F10 exec studio-buddy-voice stop
+bindsym --no-repeat F10 nop studio-buddy:start
+bindsym --release F10 nop studio-buddy:stop
 bindsym $mod+F10 exec studio-buddy-voice show
-bindsym $mod+Shift+F10 exec studio-buddy-voice cancel
+bindsym $mod+Shift+F10 nop studio-buddy:cancel
 ```
+
+**Existing installations must replace the old `exec … start/stop` bindings with
+these `nop` bindings and install/start `studio-buddy-voice.service`.** Standalone
+`studio-buddy-voice start` now refuses capture: independently spawned commands
+cannot reliably preserve the order of a press and release. The persistent listener
+reads Sway's ordered binding events, records each intent before dispatching work,
+and cancels on startup, disconnect and shutdown. After a service restart/reconnect,
+release F10 and press again; a key already held is never inferred as a new press.
+If the listener is unavailable, F10 does nothing. `stop` and `cancel` remain usable
+from a terminal for recovery. Only the supplied exact `nop studio-buddy:…` commands
+are recognized; do not add other commands to the same binding.
 
 Hold F10, speak, release: the transcript is submitted automatically to the current
 session and the reply is spoken. Starting a recording interrupts Buddy's pending
 reply/playback. Wait for transcription before recording again; overlapping jobs are
-refused. Lost release auto-stops at 120 seconds. Changing sessions, sending text or
+refused. A missed release is bounded by PushTalk’s 120-second capture watchdog; it may
+transcribe that recording. An observed listener failure cancels and rejects its
+transcript instead. Changing sessions, sending text or
 cancelling invalidates the pending transcript. Unsaved editor text remains intact.
 Do not change projects while dictating; select the intended project first in the UI.
 
@@ -188,13 +201,13 @@ instance. Closing the background window hides it and keeps the companion running
 `studio-buddy-voice show` / `hide` control the window; `cancel` interrupts both capture
 and the response. Desktop notifications show response/error status (requires
 `notify-send` and a notification daemon). Conversation text/errors remain in the UI.
-To stop both background services:
+To stop the background services:
 
 ```sh
-systemctl --user stop studio-buddy-stt.service studio-buddy.service
+systemctl --user stop studio-buddy-voice.service studio-buddy-stt.service studio-buddy.service
 ```
 
-`studio-buddy-voice quit` exits the app; systemd also stops its dependent STT unit.
+`studio-buddy-voice quit` exits the app; systemd also stops its dependent STT and voice-listener units.
 You can still focus the editor and use existing F9 dictation, inspect it and submit
 with Ctrl+Enter. Studio Buddy does not install bindings or start microphone capture
 itself: capture runs only when you explicitly start its separate PushTalk instance.

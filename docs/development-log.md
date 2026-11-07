@@ -156,3 +156,44 @@ paid API calls were made. Actual Arch/Sway key delivery, PipeWire capture, daemo
 failure recovery and real desktop notification/speech behavior remain manual
 hardware checks. A control already inside STT IPC can delay release/cancel until
 that bounded subprocess returns (six-second timeout); GUI waiting holds no lock.
+
+## 15 — Causal Sway events and immediate transcript revocation
+RED: `UV_CACHE_DIR=/workspace/work/uv-cache QT_QPA_PLATFORM=offscreen uv run
+pytest tests/test_voice_ordering.py -q` failed all 7 tests. The missing event-source
+registration/listener API prevents expressing causal key order with the old CLI;
+its standalone start also lacks the required fail-closed migration behavior.
+Tests cover a child not executing until after source release, late GUI callbacks,
+transcript acceptance during recorder cancellation, and stream failure cleanup.
+This replaces the insufficient claim in section 14: lock acquisition cannot infer
+the order of independently spawned Sway commands.
+
+GREEN: the initial 7 tests passed. Added passing regressions for cross-process
+revocation while STT cancellation is gated, GUI timeout independence, duplicate
+listeners, fresh-start behavior after stream loss, SIGTERM and stale CLI callback
+identity. Migrated the old tests to source-issued identities; independent CLI
+`start` deliberately fails closed. The GUI checks recording identity and the existing
+window/session token before saving/submitting, under a short nonblocking state lock.
+
+Self-review RED/GREEN: a cleanup-timeout test failed because waiting for swaymsg
+could skip final mic cancellation. Cleanup now cancels first and kills/reaps a
+non-exiting child; the regression passed. An interrupted-state-write test then
+failed with JSONDecodeError after a partial write. State is now atomically replaced
+under a separate stable lock, preserving the previous usable state on interruption.
+
+REFACTOR: ruff formatting/import ordering; shared state and control helpers. Added a
+persistent listener service with ExecStopPost cancellation for crashes; changed only
+Studio Buddy's supplied F10 bindings to ordered `nop` events. Documented mandatory
+migration, source-order guarantees, fresh-press behavior, the upstream PushTalk
+pending/type-command contract and watchdog/daemon limitations. Inspected upstream
+Sway swaymsg source: raw monitored binding events are newline JSON and explicitly
+flushed. No actual Sway or audio service was installed or run.
+
+Final regression: `UV_CACHE_DIR=/workspace/work/uv-cache QT_QPA_PLATFORM=offscreen
+uv run pytest` passed all 74 tests. `UV_CACHE_DIR=/workspace/work/uv-cache uv run
+ruff check` and `git diff --check` passed. Reviewed production, tests, service,
+bindings and documentation diffs. PushTalk files/services/configuration and F9 are
+untouched; no microphone capture or paid APIs. Live Arch/Sway IPC delivery,
+systemd crash/restart behavior and PipeWire remain explicit manual checks. A
+responsive daemon is required to honor stop/cancel; an in-flight STT request can
+still occupy its six-second timeout. Missed release without detected stream loss
+uses the existing 120-second watchdog. No push performed.

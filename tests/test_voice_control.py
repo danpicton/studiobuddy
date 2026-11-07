@@ -1,4 +1,4 @@
-"""Control regressions use separate CLI processes and fake GUI/STT services only."""
+"""Control regressions use separate worker processes and fake GUI/STT services only."""
 
 import multiprocessing
 import queue
@@ -24,7 +24,7 @@ def run_client(
     lock_waiting=None,
     gui_error=None,
 ):
-    """Run the real CLI with gated fake services and real inter-process locking."""
+    """Run the control worker with gated fake services and real inter-process locking."""
     voice_input.runtime_path = lambda: Path(directory)
 
     if lock_waiting is not None:
@@ -42,7 +42,7 @@ def run_client(
         if not release.wait(10):
             raise TimeoutError("fake service gate timed out")
 
-    def request(command):
+    def request(command, **kwargs):
         if command == "start" and blocked == "gui":
             wait_for_release()
         events.put("gui:" + command)
@@ -62,8 +62,12 @@ def run_client(
 
     voice_input.request = request
     voice_input.subprocess.run = run
-    sys.argv = ["studio-buddy-voice", action]
-    results.put(voice_input.main())
+    try:
+        token = voice_input.register_action(action)
+        voice_input.control_speech(action, token)
+        results.put(0)
+    except (OSError, RuntimeError, voice_input.subprocess.SubprocessError):
+        results.put(1)
 
 
 @pytest.mark.parametrize(
@@ -145,10 +149,10 @@ def test_release_serializes_after_an_in_flight_daemon_start(tmp_path, action):
 
 
 @pytest.mark.parametrize("error", [OSError("GUI unavailable"), TimeoutError("GUI timed out")])
-def test_cancel_attempts_stt_before_failed_gui_request(monkeypatch, tmp_path, error):
+def test_cancel_attempts_stt_despite_failed_gui_request(monkeypatch, tmp_path, error):
     events = []
 
-    def request(action):
+    def request(action, **kwargs):
         events.append("gui:" + action)
         raise error
 
@@ -161,7 +165,7 @@ def test_cancel_attempts_stt_before_failed_gui_request(monkeypatch, tmp_path, er
     monkeypatch.setattr(voice_input.subprocess, "run", run)
     monkeypatch.setattr(sys, "argv", ["studio-buddy-voice", "cancel"])
     assert voice_input.main() == 1
-    assert events == ["stt:cancel", "gui:cancel"]
+    assert sorted(events) == ["gui:cancel", "stt:cancel"]
 
 
 @pytest.mark.parametrize("error", [OSError("GUI unavailable"), TimeoutError("GUI timed out")])
@@ -170,8 +174,9 @@ def test_gui_failure_never_starts_stt(monkeypatch, tmp_path, error):
     monkeypatch.setattr(voice_input, "runtime_path", lambda: tmp_path)
     monkeypatch.setattr(voice_input, "request", Mock(side_effect=error))
     monkeypatch.setattr(voice_input.subprocess, "run", run)
-    monkeypatch.setattr(sys, "argv", ["studio-buddy-voice", "start"])
-    assert voice_input.main() == 1
+    token = voice_input.register_action("start")
+    with pytest.raises(type(error)):
+        voice_input.control_speech("start", token)
     assert [call.args[0][-1] for call in run.call_args_list] == ["status"]
 
 
@@ -186,8 +191,10 @@ def test_cancel_still_notifies_gui_if_stt_fails(monkeypatch, tmp_path, failure):
         return SimpleNamespace(returncode=1, stdout=b"error\n")
 
     monkeypatch.setattr(voice_input, "runtime_path", lambda: tmp_path)
-    monkeypatch.setattr(voice_input, "request", lambda action: events.append("gui:" + action))
+    monkeypatch.setattr(
+        voice_input, "request", lambda action, **kwargs: events.append("gui:" + action)
+    )
     monkeypatch.setattr(voice_input.subprocess, "run", run)
     monkeypatch.setattr(sys, "argv", ["studio-buddy-voice", "cancel"])
     assert voice_input.main() == 1
-    assert events == ["stt:cancel", "gui:cancel"]
+    assert sorted(events) == ["gui:cancel", "stt:cancel"]

@@ -6,6 +6,21 @@ from studiobuddy.app import Window
 
 
 def exchange(qtbot, path, payload):
+    # Exercise the real IPC using identities normally prepared by the event reader.
+    from studiobuddy.voice_input import voice_state
+
+    try:
+        command = json.loads(payload)
+    except ValueError:
+        command = {}
+    if command.get("action") == "start":
+        with voice_state(path.parent) as state:
+            state.update(intent="test-recording", recording="test-recording")
+        command["token"] = "test-recording"
+        payload = json.dumps(command).encode() + b"\n"
+    elif command.get("action") == "submit":
+        command["token"] = "test-recording"
+        payload = json.dumps(command).encode() + b"\n"
     client = QLocalSocket()
     client.connectToServer(str(path))
     assert client.waitForConnected(1000)
@@ -63,7 +78,7 @@ def test_voice_socket_does_not_replace_live_server(qtbot, tmp_path):
     server.close()
 
 
-def test_client_does_not_start_when_daemon_transcribing(monkeypatch, capsys, tmp_path):
+def test_client_does_not_start_when_daemon_transcribing(monkeypatch, tmp_path):
     from types import SimpleNamespace
     from unittest.mock import Mock
 
@@ -74,11 +89,13 @@ def test_client_does_not_start_when_daemon_transcribing(monkeypatch, capsys, tmp
     monkeypatch.setattr(voice_input.subprocess, "run", run)
     monkeypatch.setattr(voice_input, "request", request)
     monkeypatch.setattr(voice_input, "runtime_path", lambda: tmp_path)
-    monkeypatch.setattr("sys.argv", ["studio-buddy-voice", "start"])
-    assert voice_input.main() == 1
+    import pytest
+
+    token = voice_input.register_action("start")
+    with pytest.raises(RuntimeError, match="busy"):
+        voice_input.control_speech("start", token)
     request.assert_not_called()
     assert run.call_args.args[0][-1] == "status"
-    assert "busy" in capsys.readouterr().err
 
 
 def test_fragmented_and_oversized_commands(qtbot, tmp_path):
@@ -166,7 +183,9 @@ def test_start_prepares_buddy_before_triggering_dedicated_stt(monkeypatch, tmp_p
 
     monkeypatch.setattr(voice_input, "runtime_path", lambda: tmp_path)
     monkeypatch.setattr(voice_input.subprocess, "run", run)
-    monkeypatch.setattr(voice_input, "request", lambda action: events.append("buddy:" + action))
-    monkeypatch.setattr("sys.argv", ["studio-buddy-voice", "start"])
-    assert voice_input.main() == 0
+    monkeypatch.setattr(
+        voice_input, "request", lambda action, **kwargs: events.append("buddy:" + action)
+    )
+    token = voice_input.register_action("start")
+    voice_input.control_speech("start", token)
     assert events == ["status", "buddy:start", "start"]

@@ -35,10 +35,43 @@ download cache is shared, model RAM and mic streams are separate. No paid STT.
 Studio Buddy's private local socket uses bounded newline JSON and a lock file;
 no TCP listener, focus injection, model tools or automatic memory writes.
 
-Voice CLI processes coordinate through `voice-control.lock` in the private runtime
-directory. Its per-start token is invalidated by release/cancel. GUI preparation
-runs without holding that lock, so a slow GUI cannot make a released key start
-capture later. The final token check and STT start are serialized with stop/cancel;
-an already-issued daemon start completes before release/cancel is sent. Cancellation
-always attempts STT before contacting the GUI, and attempts GUI cancellation even
-if STT reports an error. Never remove the lock file while clients are running.
+The persistent `studio-buddy-voice listen-sway` process subscribes to Sway's
+ordered `binding` IPC events using `swaymsg -r -m`. Inspected upstream
+[swaymsg source](https://github.com/swaywm/sway/blob/master/swaymsg/main.c):
+raw monitored events are one JSON object per line, flushed after each event. The supplied `nop` bindings
+carry actions directly in that stream; they do not spawn independent key-command
+processes. The listener assigns a unique identity and registers intent synchronously
+before dispatching any blocking work. The causal guarantee is stream order, not
+UUID order or process scheduling. Standalone CLI `start` is rejected. Events not
+observed before subscription are never inferred; startup/disconnect/shutdown revoke
+old intent and require a fresh press. A lock prevents duplicate listeners. The unit
+also cancels in ExecStopPost, covering crashes/SIGKILL when Python cleanup cannot run.
+
+Two stable lock files in the private runtime directory have separate responsibilities.
+`voice-control.lock` serializes STT operations; `voice-state.lock` protects intent,
+recording identity and cancellation revision in atomically replaced `voice-state.json`.
+An interrupted write leaves the previous state usable for crash cleanup.
+State transactions contain no socket
+or STT waits. Release revokes pending starts; cancel also revokes transcript acceptance
+before either IPC operation. GUI cancellation and recorder cancellation run independently,
+so a hung/unavailable GUI cannot prevent the recorder attempt and a slow recorder
+cannot leave transcripts eligible. GUI start/submit requests carry recording identity;
+GUI cancel carries revision so an old callback cannot cancel a newer recording.
+The GUI uses a nonblocking state lock and rejects a command if that lock is busy.
+Acceptance and cancellation linearize under that lock: an already-accepted transcript
+cannot be retroactively unsent; any submit after revocation is rejected before SQLite/AI.
+
+Unmodified PushTalk's worker keeps `pending` nonzero until its synchronous type-command
+subprocess exits (including timeout/kill). Status therefore remains `transcribing`
+until callbacks drain; Studio Buddy requires `idle` before assigning a new recording.
+The callback snapshots the recording identity before GUI IPC, so a delayed socket
+message cannot attach to a later recording. This integration depends on that upstream
+status/type-command contract and exclusive use of Studio Buddy's dedicated daemon;
+do not send it unrelated `sttctl start` commands. No PushTalk file or F9 binding changes.
+
+STT IPC remains bounded by its six-second subprocess timeout. An in-flight STT start
+is serialized before a later stop/cancel; cancellation cannot promise a responsive
+microphone daemon when that daemon itself is hung. Missed releases without a detected
+stream failure remain bounded by PushTalk's configured 120-second watchdog. Live
+Sway delivery, service lifecycle and microphone behavior still require hardware checks.
+Never remove lock files while clients are running.
