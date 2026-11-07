@@ -94,3 +94,12 @@ feat/studio-buddy-mvp was successfully pushed using existing platform Git access
 Environment status still reports revision 1 with no custom domains applied; the
 saved network draft has not changed runtime access. GitHub API access remains blocked.
 Reusable uv install/start instructions were saved in the environment draft.
+
+## Review fix 1 — Minimal Qt dependency
+RED: `QT_QPA_PLATFORM=offscreen uv run pytest tests/test_dependencies.py -q`
+failed as expected: the default dependency closure included Qt Addons, WebEngine
+and PDF. The regression checks the resolved installation, not just the direct name.
+GREEN / regression: 34 tests passed; `uv run ruff check` passed. Removed the full
+Qt metapackage and its Addons/WebEngine/PDF closure. During migration, uninstalling
+the metapackage removed a shared PySide6 file; reinstalling Essentials repaired it.
+No further refactor was needed. Live Arch/Sway/audio checks remain unrun.

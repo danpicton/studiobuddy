@@ -27,6 +27,9 @@ Ensure `~/.local/bin` is on your PATH (`uv tool update-shell` can help).
 `--mock` exercises the actual desktop UI with deterministic local replies; ordinary
 launch uses OpenAI. A mock reply is not a live AI verification.
 To update after pulling changes: `uv tool install --reinstall .`.
+When updating an existing development environment from the full Qt bundle, run
+`uv sync --locked --reinstall-package pyside6-essentials` once to restore shared
+PySide6 files removed by uninstalling the old bundle.
 For a desktop launcher, copy `packaging/studio-buddy.desktop` into
 `~/.local/share/applications/` and ensure the Sway session PATH includes `~/.local/bin`.
 Normal operation requires no root privileges or Docker. No Codex CLI is required.
