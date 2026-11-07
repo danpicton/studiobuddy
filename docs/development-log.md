@@ -35,3 +35,10 @@ RED: speech module absent. GREEN: 12 passed, including text silence and a cancel
 provider deliberately returning stale audio. Generation fencing prevents playback.
 Piper CLI follows OHF-Voice/piper1-gpl documentation; ffplay subprocess is killed and
 reaped on cancellation. REFACTOR: format; regression 12 passed. Hardware untested.
+
+## 7 — ElevenLabs adapter
+RED: providers module missing. GREEN: 14 passed. Mock HTTP verifies endpoint,
+voice settings, missing credentials and rate limits. Official elevenlabs-python
+reference consulted. Audio is downloaded asynchronously in bounded chunks, then
+played; cancellation closes HTTP stream. REFACTOR: shared bounded download helper;
+regression 14 passed. Settings wiring follows in packaging/settings slice.
