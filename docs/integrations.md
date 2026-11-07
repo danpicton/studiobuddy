@@ -67,3 +67,13 @@ from the connected account. The subscription preview rejects max_output_tokens;
 the length setting is therefore only a prompt target in subscription mode.
 This personal app keeps one account registration. Account eligibility, browser
 round-trip and a real subscription reply require the user's live desktop check.
+
+## ReMCP adapter (2026-11-07)
+
+The previously blocked official page is now accessible:
+https://www.renoise.com/tools/renoise-mcp identifies kunitoki's ReMCP, default
+Streamable HTTP endpoint http://localhost:19714/mcp, and read-only tool names.
+Studio Buddy selects resources when advertised, otherwise offers a fixed allowlist
+of five argument-free song/list reads from the advertised tool catalogue. Tool
+names/descriptions/schemas are never exposed to the AI. No write or Lua tool calls.
+This supersedes the earlier resource-only compatibility limitation.

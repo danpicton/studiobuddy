@@ -266,32 +266,37 @@ press again once the backend is ready. Backend/listener restart revokes old inte
 late jobs cannot be relabelled as a new recording. Shutdown closes the mic and
 revokes acceptance; systemd enforces a ten-second stop deadline for native code.
 
-## Optional Renoise context — compatibility limitation
+## Optional Renoise context
 
-The requested tool is <https://www.renoise.com/tools/renoise-mcp>. Install it according
-to its own documentation. **Compatibility with that specific tool is not yet verified**:
-the tool page was blocked by the build environment's network policy. The accessible
-`zakhap/renoise-mcp` project documents write/evaluate-Lua tools, which this app refuses
-to invoke. Do not assume it is the same project or substitute it for a resource server.
+[ReMCP by kunitoki](https://www.renoise.com/tools/renoise-mcp) exposes song data
+through MCP tools. Studio Buddy supports five fixed, argument-free reads:
+`song_get_info`, `tracks_list`, `patterns_list`, `instruments_list`, and
+`sequencer_list`. Write tools and arbitrary Lua execution are never available to
+the AI. Servers advertising MCP resources continue to use the resource interface.
 
-Renoise support is an optional installation extra. From the checkout, run
-`uv tool install --reinstall '.[renoise]'` (development: `uv sync --extra renoise`).
-The default installation omits MCP and its server/authentication dependencies.
+For checkout development with voice support:
 
-This release implements the official MCP **Streamable HTTP resource** interface only.
-If your server publishes read-only song/note resources, enable MCP in Settings and
-enter its documented local HTTP endpoint, then Connect. `http://127.0.0.1:8000/mcp`
-is only a configurable example, not a verified ReMCP default. Select one advertised
-resource and **Read once**. Up to 8,000 text characters become untrusted, observed
-context on the next AI request only. Refresh explicitly when the song changes.
-There is no background polling, no full-song upload and no AI tool access.
+```bash
+uv sync --extra speech --extra renoise
+uv run --extra speech --extra renoise studio-buddy
+```
 
-Only literal loopback/localhost endpoints are accepted, without credentials,
-queries or redirects. No MCP tools are listed or called; arbitrary Lua execution is
-never allowed. Servers exposing only tools, SSE or stdio are unsupported in v0.1.
-No song, track, pattern, arrangement or instrument capabilities are invented.
-Disconnected/unsupported MCP leaves ordinary chat fully usable. A verified adapter
-for the specific Renoise server remains the principal integration gap.
+For the separate installed command, use
+`uv tool install --reinstall '.[speech,renoise]'`, then restart the app.
+Renoise support is optional; the default installation omits MCP dependencies.
+
+Start the server in Renoise via Tools → Renoise MCP. Enable MCP in Studio Buddy
+Settings, use ReMCP's default `http://localhost:19714/mcp` (or your configured
+endpoint), Save, then Connect. Select an observation and click **Read once**.
+Up to 8,000 text characters become untrusted context for the next AI request only.
+Refresh explicitly when the song changes. There is no background polling or AI
+access to tools. Only literal loopback/localhost HTTP endpoints are accepted,
+without credentials, queries or redirects. SSE and stdio are unsupported.
+Disconnected MCP leaves chat usable.
+
+Mocked tests cover capability selection and the read-only allowlist. Live ReMCP
+compatibility on Arch/Sway still requires a manual Connect → Read once → chat check
+with Renoise and a song loaded; no paid API call is needed to test Connect/Read once.
 
 ## Local files, privacy and backup
 

@@ -367,3 +367,22 @@ Manual checks still required: reload the updated app on Arch/Sway, reproduce wit
 Test Voice and inspect stderr or the Studio Buddy service journal; this uses paid
 ElevenLabs generation and actual audio output. No paid calls, microphone capture,
 hardware tests or live voice/key checks were run, and PushTalk was untouched.
+
+## ReMCP read-only observations
+RED: `QT_QPA_PLATFORM=offscreen uv run --extra speech --extra renoise pytest
+ tests/test_renoise.py -q` produced 2 expected failures (missing tool observation
+methods), 3 passes. Cache access required an authorized sandbox rerun.
+Confirmed the official Renoise tool page documents ReMCP on port 19714 and
+song_get_info, tracks_list, patterns_list, instruments_list and sequencer_list
+as reads. User's server rejects resources/list with -32601.
+GREEN: all 7 Renoise adapter tests passed, including resource-only preservation,
+tool-only capability routing, rejecting unadvertised/write/Lua calls, bounded text
+and tool error handling. REFACTOR: kept capability dispatch inside the adapter;
+existing background worker, cancellation and one-request UI context flow remain.
+Full required regression: `QT_QPA_PLATFORM=offscreen uv run pytest` passed 140 tests;
+`uv run ruff check` passed after adding the explicit ClassVar annotation flagged
+by the first lint run. `git diff --check` passed. Checks used authorized uv cache
+access outside the sandbox. No live Renoise reads, paid API calls, microphone or
+hardware checks were performed. Manual Arch/Sway check: restart the checkout app
+with speech and renoise extras, Connect, select an observation, Read once and send
+a chat message. PushTalk was untouched.
