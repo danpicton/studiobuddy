@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Studio Buddy
+Comment=A little company for your next loop
+Exec=studio-buddy
+Icon=audio-x-generic
+Terminal=false
+Categories=AudioVideo;Audio;
+StartupWMClass=studio-buddy

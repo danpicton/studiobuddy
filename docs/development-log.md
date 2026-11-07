@@ -74,3 +74,14 @@ request; now consumed once. Stale-AI cancellation test passed without changes.
 GREEN: 26 passed. REFACTOR: formatting/import organization and explicit exception
 boundary comments; ruff clean, regression 26 passed. Request counts persist per
 session. Secrets are never written to settings. Native packaging/docs next.
+
+## 11b — Packaging and verification
+Additional regression checks (passed immediately, not claimed as RED evidence):
+real OpenAI SDK with mocked HTTP 401/429 responses, and cancellation of a real
+sleeping subprocess with verified child reaping. Full suite: 29 passed on Python 3.12.
+ruff check passed. uv build produced sdist and wheel. Offscreen desktop smoke opened
+the real 540×680 window, sent/received a message, captured and visually inspected its
+rendering, and shut down cleanly. CI matrix for Python 3.11/3.12 is configured but
+remote CI has not been observed. Documentation covers install, credential setup,
+provider differences, PushTalk independence, Sway and live verification gaps.
+GitHub API probe returned Forbidden; native Git publication is tested separately.

@@ -39,3 +39,32 @@ async def test_api_error_is_safe():
     with pytest.raises(AIError, match="connection") as error:
         await OpenAIBackend(client=client).reply([])
     assert "secret" not in str(error.value)
+
+
+@pytest.mark.parametrize("code, message", [(401, "authentication"), (429, "credits")])
+async def test_real_sdk_error_mapping(code, message, monkeypatch):
+    import httpx
+    from openai import AsyncOpenAI
+
+    monkeypatch.setenv("OPENAI_API_KEY", "test-only")
+    async with AsyncOpenAI(
+        api_key="test-only",
+        max_retries=0,
+        http_client=httpx.AsyncClient(
+            transport=httpx.MockTransport(
+                lambda request: httpx.Response(
+                    code,
+                    json={
+                        "error": {
+                            "message": "secret remote body",
+                            "type": "error",
+                            "code": "insufficient_quota",
+                        }
+                    },
+                )
+            )
+        ),
+    ) as client:
+        with pytest.raises(AIError, match=message) as error:
+            await OpenAIBackend(client=client).reply([])
+        assert "secret remote body" not in str(error.value)

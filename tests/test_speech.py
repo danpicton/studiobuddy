@@ -58,3 +58,32 @@ async def test_cancelled_generation_never_plays():
 async def test_missing_piper_model():
     with pytest.raises(SpeechError, match="model"):
         await Piper("/does/not/exist.onnx").generate("hello")
+
+
+async def test_process_cancellation_reaps_child(tmp_path):
+    import sys
+
+    from studiobuddy.speech import process
+
+    pidfile = tmp_path / "pid"
+    task = asyncio.create_task(
+        process(
+            sys.executable,
+            "-c",
+            'import os,time,pathlib; pathlib.Path(__import__("sys").argv[1]).write_text(str(os.getpid())); time.sleep(60)',
+            str(pidfile),
+        )
+    )
+    for _ in range(100):
+        if pidfile.exists():
+            break
+        await asyncio.sleep(0.01)
+    assert pidfile.exists()
+    pid = int(pidfile.read_text())
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    import os
+
+    with pytest.raises(ProcessLookupError):
+        os.kill(pid, 0)

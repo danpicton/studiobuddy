@@ -1,0 +1,16 @@
+model = "gpt-4.1-mini"
+request_limit = 100
+max_output_tokens = 300
+voice_mode = false
+provider = "piper"
+piper_model = ""
+eleven_voice = ""
+eleven_model = "eleven_multilingual_v2"
+eleven_stability = 0.5
+hume_voice = ""
+hume_description = "Warm, conversational, a little wry"
+hume_speed = 1.0
+fallback = "text"
+theme = "dark"
+mcp_enabled = false
+mcp_url = "http://127.0.0.1:8000/mcp"
