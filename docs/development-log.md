@@ -197,3 +197,74 @@ systemd crash/restart behavior and PipeWire remain explicit manual checks. A
 responsive daemon is required to honor stop/cancel; an in-flight STT request can
 still occupy its six-second timeout. Missed release without detected stream loss
 uses the existing 120-second watchdog. No push performed.
+
+## 16 — Immutable capture identities and scoped terminal controls
+RED: `QT_QPA_PLATFORM=offscreen UV_CACHE_DIR=/workspace/work/uv-cache uv run
+pytest tests/test_voice_lifecycle.py -q` first failed all four regression cases:
+delayed stop/cancel workers emitted unscoped terminal operations after a newer
+start; release suppressed GUI cancellation; an identity-free transcript callback
+adopted the current recording and returned success. Adding two backend lifecycle
+regressions produced six failures (two missing-backend imports). No audio/API use.
+
+Design correction: the unchanged PushTalk daemon's watchdog clears recorder state,
+then notifies, then increments pending. Its `idle` status is therefore not a
+callback-drain fence. A shared static type command cannot recover the originating
+recording, even if the status window were narrowed. Studio Buddy will use a separate
+token-aware capture backend with the same faster-whisper/sounddevice stack and
+warm model. PushTalk itself and F9 remain independent and untouched. The backend
+must seal audio and identity together, scope every terminal operation, and carry
+the immutable identity through transcription and GUI acceptance. Release does not
+advance the generation that supersedes GUI cancellation; only a new start does.
+
+GREEN: the original six cases passed after introducing immutable backend job tokens,
+scoped terminal commands, recording generations separate from releases, and rejection
+of untagged callbacks. The old `idle` precheck is removed. New presses supersede old
+audio/transcripts; one warm model performs inference, with one bounded waiting job.
+The sample cap seals capture and token under one lock; no watchdog notification gap
+or status sampling can reassign a job's identity. The GUI remains the final durable
+acceptance boundary, including callbacks already inside IPC when cancellation occurs.
+
+Focused self-review RED → GREEN:
+- A lost start acknowledgement test failed with capture still active. Failed starts
+  now durably revoke and attempt generation-scoped backend/GUI cancellation independently.
+- Cancel during a newer GUI preparation failed to discard superseded old audio. Only
+  cancellation of the current durable generation can now discard such older audio;
+  delayed older workers retain their original scope and cannot stop newer capture.
+- Shutdown initially revoked after stream.close. A gated close test failed, then
+  passed with revocation before potentially slow close and GUI notification afterward.
+- Two GUI lock-contention tests failed because cancel returned busy and lost the
+  playback interruption. Cancellation now retries on the Qt event loop and validates
+  the generation again; ordinary release preserves it, a new recording supersedes it.
+
+REFACTOR: shared JSON socket exchange, short state transactions, immutable CaptureJob,
+one capture lock for audio/identity/sealing, and a stable backend owner lock. Updated
+existing process tests to the token protocol; replaced the obsolete busy-sttd status
+expectation with actual backend lifecycle tests. Added 12 backend tests covering
+real Unix IPC and separate delayed worker processes, queued starts after release,
+malformed/oversized messages, bounded samples/jobs, model failure recovery, in-flight
+old callback rejection by the actual GUI socket, duplicate owners, model-load failure,
+shutdown during loading, and socket/mic/lock cleanup. Fake streams/models only.
+
+Packaging now runs `studio-buddy-stt`, installed via the optional `speech` extra.
+Heavy dependencies remain lazy and were resolved into uv.lock but not installed or
+executed for these tests. The Studio Buddy STT service includes crash revocation and
+a ten-second systemd stop deadline. README documents mandatory reinstall/unit restart,
+private token transport, supersession/queue behavior, PortAudio and live-check limits.
+PushTalk's original daemon, configuration, services and F9 were neither edited nor run.
+
+Regression: full `QT_QPA_PLATFORM=offscreen UV_CACHE_DIR=/workspace/work/uv-cache
+uv run pytest` passed 95 tests before the final lint-only cleanup. Ruff initially
+reported seven conventions/style findings, which were corrected (the model worker's
+broad catch intentionally isolates failed jobs without logging sensitive bodies).
+Final post-cleanup checks are recorded below. No microphone capture, paid API calls,
+service deployment or push. Actual Arch/Sway event delivery, PipeWire dual streams,
+real faster-whisper model load/latency/accuracy and systemd crash handling remain live
+checks. A running native inference is not forcibly interrupted on cancel, but its
+output is rejected; a new completed capture may wait for it. Backend restarts revoke
+old intent and require a fresh press. Five-second control IPC timeouts bound a stuck
+control call; capture is capped at 120 seconds of samples even if control is stalled.
+
+Final post-cleanup regression: 95 tests passed in 11.00 seconds with the full command
+above. `UV_CACHE_DIR=/workspace/work/uv-cache uv run ruff check` and `git diff --check`
+passed. Reviewed production/controller/backend, migrated and new tests, packaging,
+README and dependency lock changes. The inspected PushTalk checkout remains clean.

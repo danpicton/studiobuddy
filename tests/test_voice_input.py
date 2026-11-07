@@ -15,10 +15,12 @@ def exchange(qtbot, path, payload):
         command = {}
     if command.get("action") == "start":
         with voice_state(path.parent) as state:
-            state.update(intent="test-recording", recording="test-recording")
+            state.update(
+                generation="test-recording", intent="test-recording", recording="test-recording"
+            )
         command["token"] = "test-recording"
         payload = json.dumps(command).encode() + b"\n"
-    elif command.get("action") == "submit":
+    elif command.get("action") in ("submit", "cancel"):
         command["token"] = "test-recording"
         payload = json.dumps(command).encode() + b"\n"
     client = QLocalSocket()
@@ -76,26 +78,6 @@ def test_voice_socket_does_not_replace_live_server(qtbot, tmp_path):
     with pytest.raises(RuntimeError, match="already running"):
         VoiceServer(server.path, window)
     server.close()
-
-
-def test_client_does_not_start_when_daemon_transcribing(monkeypatch, tmp_path):
-    from types import SimpleNamespace
-    from unittest.mock import Mock
-
-    from studiobuddy import voice_input
-
-    run = Mock(return_value=SimpleNamespace(returncode=0, stdout=b"transcribing\n"))
-    request = Mock()
-    monkeypatch.setattr(voice_input.subprocess, "run", run)
-    monkeypatch.setattr(voice_input, "request", request)
-    monkeypatch.setattr(voice_input, "runtime_path", lambda: tmp_path)
-    import pytest
-
-    token = voice_input.register_action("start")
-    with pytest.raises(RuntimeError, match="busy"):
-        voice_input.control_speech("start", token)
-    request.assert_not_called()
-    assert run.call_args.args[0][-1] == "status"
 
 
 def test_fragmented_and_oversized_commands(qtbot, tmp_path):
@@ -174,18 +156,17 @@ def test_start_prepares_buddy_before_triggering_dedicated_stt(monkeypatch, tmp_p
 
     events = []
 
-    def run(command, **kwargs):
-        events.append(command[-1])
-        assert command[:3] == ["sttctl", "--socket", str(tmp_path / "sttd.sock")]
-        return SimpleNamespace(
-            returncode=0, stdout=b"idle\n" if command[-1] == "status" else b"recording\n"
-        )
+    def run(directory, action, *, token):
+        events.append(action)
+        assert directory == tmp_path
+        assert token
+        return SimpleNamespace(returncode=0, stdout=b"recording\n")
 
     monkeypatch.setattr(voice_input, "runtime_path", lambda: tmp_path)
-    monkeypatch.setattr(voice_input.subprocess, "run", run)
+    monkeypatch.setattr(voice_input, "speech_command", run)
     monkeypatch.setattr(
         voice_input, "request", lambda action, **kwargs: events.append("buddy:" + action)
     )
     token = voice_input.register_action("start")
     voice_input.control_speech("start", token)
-    assert events == ["status", "buddy:start", "start"]
+    assert events == ["buddy:start", "start"]

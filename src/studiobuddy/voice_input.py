@@ -1,4 +1,4 @@
-"""Private transcript IPC; capture and Whisper stay in an unmodified PushTalk instance."""
+"""Ordered key intents and private, generation-scoped voice IPC."""
 
 import argparse
 import fcntl
@@ -20,6 +20,10 @@ from PySide6.QtNetwork import QLocalServer
 MAX_MESSAGE = 20000
 
 
+class VoiceStateBusy(RuntimeError):
+    pass
+
+
 def runtime_path():
     base = os.environ.get("XDG_RUNTIME_DIR")
     if not base:
@@ -38,12 +42,16 @@ def request(action, text=None, *, token=None):
         payload["token"] = token
     if text is not None:
         payload["text"] = text
+    return exchange(runtime_path() / "voice.sock", payload)
+
+
+def exchange(path, payload):
     data = json.dumps(payload, ensure_ascii=False).encode() + b"\n"
     if len(data) > MAX_MESSAGE:
         raise RuntimeError("Transcript too long")
     with socket.socket(socket.AF_UNIX) as connection:
         connection.settimeout(5)
-        connection.connect(str(runtime_path() / "voice.sock"))
+        connection.connect(str(path))
         connection.sendall(data)
         response = bytearray()
         while b"\n" not in response and len(response) <= MAX_MESSAGE:
@@ -51,9 +59,14 @@ def request(action, text=None, *, token=None):
             if not chunk:
                 raise RuntimeError("Studio Buddy disconnected")
             response.extend(chunk)
+    if len(response) > MAX_MESSAGE:
+        raise RuntimeError("Invalid voice response")
     result = json.loads(response)
+    if not isinstance(result, dict):
+        raise TypeError("Invalid voice response")
     if not result.get("ok"):
         raise RuntimeError(result.get("error", "Studio Buddy rejected the command"))
+    return result
 
 
 @contextmanager
@@ -68,18 +81,8 @@ def control_lock(directory):
             fcntl.flock(control, fcntl.LOCK_UN)
 
 
-def speech_command(directory, action):
-    result = subprocess.run(
-        ["sttctl", "--socket", str(directory / "sttd.sock"), action],
-        capture_output=True,
-        timeout=6,
-        check=False,
-    )
-    if action == "status":
-        if result.returncode or result.stdout.strip() != b"idle":
-            raise RuntimeError("Speech daemon busy or unavailable; wait for transcription")
-    elif result.returncode or result.stdout.strip().startswith(b"error"):
-        raise RuntimeError("Speech daemon unavailable or busy; check studio-buddy-stt.service")
+def speech_command(directory, action, *, token=None):
+    return exchange(directory / "capture.sock", {"action": action, "token": token})
 
 
 @contextmanager
@@ -90,7 +93,7 @@ def voice_state(directory, *, blocking=True):
         try:
             fcntl.flock(state_file, flags)
         except BlockingIOError:
-            raise RuntimeError("Voice control busy; transcript rejected") from None
+            raise VoiceStateBusy("Voice control busy; transcript rejected") from None
         try:
             path = directory / "voice-state.json"
             state = json.loads(path.read_text()) if path.exists() else {}
@@ -111,12 +114,13 @@ def voice_state(directory, *, blocking=True):
 
 
 def register_action(action):
-    """Called synchronously by the ordered event reader, before dispatching work."""
-    token = uuid4().hex
+    """Register source order before workers; terminal actions target that generation."""
     with voice_state(runtime_path()) as state:
-        state["revision"] = token
+        if action == "start" or not state.get("generation"):
+            state["generation"] = uuid4().hex
+        token = state["generation"]
         state["intent"] = token if action == "start" else None
-        if action == "cancel":
+        if action in ("start", "cancel"):
             state["recording"] = None
     return token
 
@@ -134,47 +138,48 @@ def control_speech(action, token=None):
             gui = executor.submit(request, "cancel", token=token)
             try:
                 with control_lock(directory):
-                    speech_command(directory, "cancel")
+                    speech_command(directory, "cancel", token=token)
             finally:
                 gui.result()
         return
     if action == "stop":
         with control_lock(directory):
-            speech_command(directory, "stop")
+            speech_command(directory, "stop", token=token)
         return
 
-    with control_lock(directory):
-        with voice_state(directory) as state:
-            if state.get("intent") != token:
-                return
-        speech_command(directory, "status")
-        with voice_state(directory) as state:
-            if state.get("intent") != token:
-                return
-            # PushTalk remains busy until its synchronous type-command exits.
-            # An idle status therefore drains old callbacks before reassignment.
-            state["recording"] = token
+    with control_lock(directory), voice_state(directory) as state:
+        if state.get("intent") != token:
+            return
+        # Every backend job carries this immutable origin. No status sample
+        # or callback-time lookup is used to infer which recording it was.
+        state["recording"] = token
     try:
         request("start", token=token)
         with control_lock(directory):
             with voice_state(directory) as state:
                 if state.get("intent") != token or state.get("recording") != token:
                     return
-            speech_command(directory, "start")
-    except (OSError, RuntimeError, subprocess.SubprocessError):
+            speech_command(directory, "start", token=token)
+    except (OSError, RuntimeError, ValueError, TypeError, subprocess.SubprocessError):
         with voice_state(directory) as state:
             if state.get("recording") == token:
                 state["recording"] = None
             if state.get("intent") == token:
                 state["intent"] = None
-        request("cancel", token=token)
+        # A timed-out start may already have reached the backend. Cancel the
+        # same generation, independently of GUI availability, then preserve the
+        # original error. The backend also rejects queued starts after revocation.
+        try:
+            control_speech("cancel", token)
+        except (OSError, RuntimeError, ValueError, TypeError, subprocess.SubprocessError):
+            pass
         raise
 
 
 def report_control(action, token):
     try:
         control_speech(action, token)
-    except (OSError, RuntimeError, ValueError, subprocess.SubprocessError):
+    except (OSError, RuntimeError, ValueError, TypeError, subprocess.SubprocessError):
         print("Studio Buddy: voice control failed; check services", file=sys.stderr)
 
 
@@ -252,6 +257,10 @@ class VoiceServer(QObject):
             raise RuntimeError("Cannot create Studio Buddy voice socket")
         self.server.newConnection.connect(self.accept)
         self.connections = set()
+        self.pending_cancels = set()
+        self.cancel_timer = QTimer(self)
+        self.cancel_timer.setSingleShot(True)
+        self.cancel_timer.timeout.connect(self.retry_cancels)
 
     def accept(self):
         while self.server.hasPendingConnections():
@@ -296,24 +305,36 @@ class VoiceServer(QObject):
             if connection.bytesAvailable():
                 read()
 
+    def retry_cancels(self):
+        try:
+            with voice_state(self.path.parent, blocking=False) as state:
+                if state.get("generation") in self.pending_cancels:
+                    state["intent"] = state["recording"] = None
+                    self.recording = None
+                    self.window.cancel()
+                self.pending_cancels.clear()
+                self.cancel_timer.stop()
+        except VoiceStateBusy:
+            # Retry on the Qt event loop, never block it or lose cancellation to
+            # the backend's simultaneous short state transaction.
+            self.cancel_timer.start(10)
+
     def dispatch(self, payload):
         if not isinstance(payload, dict):
             raise TypeError("Expected object")
         action = payload["action"]
         window = self.window
-        if action in ("start", "submit", "cancel"):
+        if action == "cancel":
+            token = payload.get("token")
+            if not isinstance(token, str) or not token:
+                raise ValueError("Cancellation requires a generation")
+            self.pending_cancels.add(token)
+            self.retry_cancels()
+        elif action in ("start", "submit"):
             token = payload.get("token")
             # Qt must not wait for another process, and acceptance/cancellation
             # must have one cross-process linearization point before DB/AI work.
             with voice_state(self.path.parent, blocking=False) as state:
-                if action == "cancel":
-                    if token is None:
-                        state["intent"] = state["recording"] = None
-                    elif state.get("revision") != token:
-                        return
-                    self.recording = None
-                    window.cancel()
-                    return
                 if not token or token != state.get("recording"):
                     raise RuntimeError("Recording was interrupted; hold F10 to try again")
                 if action == "start":
@@ -350,6 +371,8 @@ class VoiceServer(QObject):
             raise ValueError("Unknown command")
 
     def close(self):
+        self.cancel_timer.stop()
+        self.pending_cancels.clear()
         for connection in list(self.connections):
             connection.abort()
         self.server.close()
@@ -362,17 +385,16 @@ def main():
         "action",
         choices=("start", "stop", "submit", "cancel", "show", "hide", "quit", "listen-sway"),
     )
+    parser.add_argument("--token", help="immutable capture origin (required for submit)")
     args = parser.parse_args()
     try:
         if args.action == "submit":
+            if not args.token:
+                raise RuntimeError("Transcript requires its original recording token")
             raw = sys.stdin.buffer.read(MAX_MESSAGE + 1)
             if len(raw) > MAX_MESSAGE:
                 raise RuntimeError("Transcript too long")
-            with voice_state(runtime_path()) as state:
-                token = state.get("recording")
-            if not token:
-                raise RuntimeError("Recording was interrupted; hold F10 to try again")
-            request("submit", raw.decode("utf-8"), token=token)
+            request("submit", raw.decode("utf-8"), token=args.token)
         elif args.action == "listen-sway":
             listen_sway()
         elif args.action in ("start", "stop", "cancel"):
@@ -381,7 +403,7 @@ def main():
             request(args.action)
     except KeyboardInterrupt:
         return 0
-    except (OSError, RuntimeError, ValueError, subprocess.SubprocessError) as error:
+    except (OSError, RuntimeError, ValueError, TypeError, subprocess.SubprocessError) as error:
         # Do not print transcript, subprocess output, remote bodies or credentials.
         message = str(error) if isinstance(error, RuntimeError) else "Voice command failed"
         print(f"Studio Buddy: {message}", file=sys.stderr)

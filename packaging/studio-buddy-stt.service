@@ -1,7 +1,7 @@
-# Requires an installed, unmodified danpicton/pushtalk (sttd and sttctl).
+# Requires Studio Buddy installed with its optional speech extra.
 # Deliberately independent of sttd.service and all existing F9 configuration.
 [Unit]
-Description=Studio Buddy dedicated PushTalk speech recognition
+Description=Studio Buddy token-aware speech recognition
 Requires=studio-buddy.service
 After=studio-buddy.service
 PartOf=studio-buddy.service
@@ -13,7 +13,10 @@ Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin
 RuntimeDirectory=studio-buddy
 RuntimeDirectoryMode=0700
 RuntimeDirectoryPreserve=yes
-ExecStart=%h/.local/bin/sttd --model small.en --compute-type int8 --threads 4 --preroll 0 --max-duration 120 --socket %t/studio-buddy/sttd.sock --state-file %t/studio-buddy/sttd.state --type-cmd 'studio-buddy-voice submit' --no-trailing-space
+ExecStart=%h/.local/bin/studio-buddy-stt --model small.en --compute-type int8 --threads 4 --max-duration 120
+# Revoke GUI acceptance after crashes/SIGKILL too. PushTalk/F9 are independent.
+ExecStopPost=-%h/.local/bin/studio-buddy-voice cancel
+TimeoutStopSec=10
 Restart=on-failure
 RestartSec=2
 MemoryMax=6G

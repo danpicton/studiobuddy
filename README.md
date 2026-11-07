@@ -3,7 +3,7 @@
 A native, local-first musical companion for Renoise. Chat about the loop you have,
 try one next experiment, remember the good bits, and pick up where you left off.
 Python 3.11+, PySide6, SQLite, OpenAI Responses, and Piper / ElevenLabs / Hume
-speech. Background voice interaction via a dedicated, unmodified PushTalk daemon;
+speech. Background voice interaction via a dedicated token-aware speech backend;
 the native UI remains available for settings, projects, notes and text conversation.
 No Renoise editing.
 
@@ -128,28 +128,27 @@ manually; this release does not fetch cloud voice catalogues.
 
 ## Background voice on F10 (recommended)
 
-Install [PushTalk](https://github.com/danpicton/pushtalk) normally so `sttd` and
-`sttctl` are on PATH. No changes to PushTalk source, configuration, `sttd.service`
-or F9 are required. We reuse its existing `--socket`, `--state-file` and
-`--type-cmd` interfaces in a **second instance**. The existing daemon injects text
-with wtype; the Studio Buddy instance sends stdin transcripts to
-`studio-buddy-voice submit` through a private local socket. No window focus needed.
+Studio Buddy uses a separate capture backend with the same faster-whisper /
+CTranslate2 / sounddevice stack as [PushTalk](https://github.com/danpicton/pushtalk).
+PushTalk source, configuration, `sttd.service` and F9 remain untouched. Studio Buddy
+owns its private capture socket and carries a recording token alongside the audio
+through transcription and GUI submission. It does not infer recording identity from
+an `idle` status or use PushTalk's shared `--type-cmd` callback.
 
-Recommended STT matches PushTalk: faster-whisper / CTranslate2, CPU, int8,
-`small.en` for English. The supplied service uses four threads to leave room for
-music, and zero pre-roll to reduce pickup of Buddy's previous reply. Change these
-in the Studio Buddy service only. For other languages use a multilingual model
-and `--language auto`. Both instances share Hugging Face's downloaded model cache,
-but each loads its own model in RAM and opens its own mic stream. Check PipeWire
-allows both. This does not reuse the already-running F9 daemon's in-memory model;
-that daemon has no per-request transcript destination API. No backend fork needed.
+The supplied service keeps a CPU int8 `small.en` model warm, uses four threads to
+leave room for music, and captures with no pre-roll. Change model/device/language
+options in the Studio Buddy service only; for other languages use a multilingual
+model and `--language auto`. Both backends share Hugging Face's downloaded model
+cache but load separate models in RAM and open separate mic streams. Check that
+PipeWire allows both. Install PortAudio on Arch (`portaudio`) and Studio Buddy's
+optional speech dependencies; ordinary UI installations do not load these libraries.
 
 First open the UI, select your project/session, configure your model and a working
 Piper voice (or chosen cloud voice), and use Test Voice. Then close the regular app
 and install the supplied units:
 
 ```sh
-uv tool install --reinstall .
+uv tool install --reinstall ".[speech]"
 mkdir -p ~/.config/systemd/user
 cp packaging/studio-buddy*.service ~/.config/systemd/user/
 systemctl --user daemon-reload
@@ -175,24 +174,36 @@ bindsym $mod+F10 exec studio-buddy-voice show
 bindsym $mod+Shift+F10 nop studio-buddy:cancel
 ```
 
-**Existing installations must replace the old `exec … start/stop` bindings with
-these `nop` bindings and install/start `studio-buddy-voice.service`.** Standalone
+**Existing installations must reinstall with the speech extra, replace the supplied
+`studio-buddy-stt.service`, and restart all three Studio Buddy services.** The old
+unit's untagged PushTalk callbacks are deliberately rejected. Replace old
+`exec … start/stop` bindings with these `nop` bindings and install/start
+`studio-buddy-voice.service`. Standalone
 `studio-buddy-voice start` now refuses capture: independently spawned commands
 cannot reliably preserve the order of a press and release. The persistent listener
 reads Sway's ordered binding events, records each intent before dispatching work,
 and cancels on startup, disconnect and shutdown. After a service restart/reconnect,
 release F10 and press again; a key already held is never inferred as a new press.
+After updating units, restart them:
+
+```sh
+systemctl --user restart studio-buddy.service studio-buddy-stt.service studio-buddy-voice.service
+```
+
 If the listener is unavailable, F10 does nothing. `stop` and `cancel` remain usable
 from a terminal for recovery. Only the supplied exact `nop studio-buddy:…` commands
 are recognized; do not add other commands to the same binding.
 
 Hold F10, speak, release: the transcript is submitted automatically to the current
 session and the reply is spoken. Starting a recording interrupts Buddy's pending
-reply/playback. Wait for transcription before recording again; overlapping jobs are
-refused. A missed release is bounded by PushTalk’s 120-second capture watchdog; it may
-transcribe that recording. An observed listener failure cancels and rejects its
-transcript instead. Changing sessions, sending text or
-cancelling invalidates the pending transcript. Unsaved editor text remains intact.
+reply/playback. A new press supersedes any older recording or transcript. The model
+runs one inference at a time; at most one newer completed recording waits for it.
+Cancellation discards captured/queued audio and rejects late output; an inference
+already running may finish in the background. A missed release is bounded by a
+120-second sample cap in the audio callback, which seals audio and its identity
+together and may transcribe that recording. An observed listener failure cancels
+and rejects its transcript instead. Changing sessions, sending text or cancelling
+invalidates the pending transcript. Unsaved editor text remains intact.
 Do not change projects while dictating; select the intended project first in the UI.
 
 `studio-buddy --background` starts hidden and enables speech for that launch using
@@ -210,12 +221,20 @@ systemctl --user stop studio-buddy-voice.service studio-buddy-stt.service studio
 `studio-buddy-voice quit` exits the app; systemd also stops its dependent STT and voice-listener units.
 You can still focus the editor and use existing F9 dictation, inspect it and submit
 with Ctrl+Enter. Studio Buddy does not install bindings or start microphone capture
-itself: capture runs only when you explicitly start its separate PushTalk instance.
-PushTalk keeps the mic open while its daemon runs, even between keypresses; it logs
-transcript excerpts (and full transcripts on injection failures) to its journal.
-Review retention there if conversations are sensitive. Check status with
-`sttctl --socket "$XDG_RUNTIME_DIR/studio-buddy/sttd.sock" status` and logs with
-`journalctl --user -u studio-buddy.service -u studio-buddy-stt.service`.
+itself: you explicitly start its separate speech service. The backend keeps its mic
+stream open while the service runs; it retains audio only while F10 recording is
+active, with no idle pre-roll. Backend logs omit audio and transcript content.
+Check services and errors:
+
+```sh
+systemctl --user status studio-buddy-stt.service studio-buddy-voice.service
+journalctl --user -u studio-buddy.service -u studio-buddy-stt.service -u studio-buddy-voice.service
+```
+
+Model loading must finish before F10 can start a capture. On failure, release and
+press again once the backend is ready. Backend/listener restart revokes old intent;
+late jobs cannot be relabelled as a new recording. Shutdown closes the mic and
+revokes acceptance; systemd enforces a ten-second stop deadline for native code.
 
 ## Optional Renoise context — compatibility limitation
 

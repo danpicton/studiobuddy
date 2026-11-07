@@ -49,8 +49,7 @@ def run_client(
         if command == "cancel" and gui_error is not None:
             raise gui_error
 
-    def run(command, **kwargs):
-        command = command[-1]
+    def run(directory, command, **kwargs):
         events.put("stt:" + command)
         if command == "start":
             if blocked == "stt":
@@ -61,7 +60,7 @@ def run_client(
         return SimpleNamespace(returncode=0, stdout=b"idle\n")
 
     voice_input.request = request
-    voice_input.subprocess.run = run
+    voice_input.speech_command = run
     try:
         token = voice_input.register_action(action)
         voice_input.control_speech(action, token)
@@ -128,7 +127,7 @@ def test_release_serializes_after_an_in_flight_daemon_start(tmp_path, action):
         assert entered.wait(10), "start did not reach the daemon"
         end.start()
         assert lock_waiting.wait(10), "release did not reach the shared control lock"
-        # The start subprocess has been invoked, but its daemon operation has not
+        # The start IPC has been invoked, but its daemon operation has not
         # completed. Release must follow that operation, never race ahead of it.
         release.set()
         for process in (start, end):
@@ -136,7 +135,7 @@ def test_release_serializes_after_an_in_flight_daemon_start(tmp_path, action):
             assert process.exitcode == 0
             assert results.get(timeout=2) == 0
         assert not recording.value
-        observed = [events.get(timeout=2) for _ in range(4 if action == "stop" else 5)]
+        observed = [events.get(timeout=2) for _ in range(3 if action == "stop" else 4)]
         assert observed.index("stt:start") < observed.index("stt:" + action)
     finally:
         release.set()
@@ -156,13 +155,13 @@ def test_cancel_attempts_stt_despite_failed_gui_request(monkeypatch, tmp_path, e
         events.append("gui:" + action)
         raise error
 
-    def run(command, **kwargs):
-        events.append("stt:" + command[-1])
+    def run(directory, command, **kwargs):
+        events.append("stt:" + command)
         return SimpleNamespace(returncode=0, stdout=b"cancelled\n")
 
     monkeypatch.setattr(voice_input, "runtime_path", lambda: tmp_path)
     monkeypatch.setattr(voice_input, "request", request)
-    monkeypatch.setattr(voice_input.subprocess, "run", run)
+    monkeypatch.setattr(voice_input, "speech_command", run)
     monkeypatch.setattr(sys, "argv", ["studio-buddy-voice", "cancel"])
     assert voice_input.main() == 1
     assert sorted(events) == ["gui:cancel", "stt:cancel"]
@@ -173,28 +172,28 @@ def test_gui_failure_never_starts_stt(monkeypatch, tmp_path, error):
     run = Mock(return_value=SimpleNamespace(returncode=0, stdout=b"idle\n"))
     monkeypatch.setattr(voice_input, "runtime_path", lambda: tmp_path)
     monkeypatch.setattr(voice_input, "request", Mock(side_effect=error))
-    monkeypatch.setattr(voice_input.subprocess, "run", run)
+    monkeypatch.setattr(voice_input, "speech_command", run)
     token = voice_input.register_action("start")
     with pytest.raises(type(error)):
         voice_input.control_speech("start", token)
-    assert [call.args[0][-1] for call in run.call_args_list] == ["status"]
+    assert [call.args[1] for call in run.call_args_list] == ["cancel"]
 
 
 @pytest.mark.parametrize("failure", ["rejected", "timeout"])
 def test_cancel_still_notifies_gui_if_stt_fails(monkeypatch, tmp_path, failure):
     events = []
 
-    def run(command, **kwargs):
-        events.append("stt:" + command[-1])
+    def run(directory, command, **kwargs):
+        events.append("stt:" + command)
         if failure == "timeout":
             raise voice_input.subprocess.TimeoutExpired(command, 6)
-        return SimpleNamespace(returncode=1, stdout=b"error\n")
+        raise RuntimeError("Capture command failed")
 
     monkeypatch.setattr(voice_input, "runtime_path", lambda: tmp_path)
     monkeypatch.setattr(
         voice_input, "request", lambda action, **kwargs: events.append("gui:" + action)
     )
-    monkeypatch.setattr(voice_input.subprocess, "run", run)
+    monkeypatch.setattr(voice_input, "speech_command", run)
     monkeypatch.setattr(sys, "argv", ["studio-buddy-voice", "cancel"])
     assert voice_input.main() == 1
     assert sorted(events) == ["gui:cancel", "stt:cancel"]

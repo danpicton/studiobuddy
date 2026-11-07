@@ -13,7 +13,7 @@ def delayed_start(directory, token, release, recording):
     voice_input.runtime_path = lambda: Path(directory)
     voice_input.request = lambda *args, **kwargs: None
 
-    def speech(directory, action):
+    def speech(directory, action, **kwargs):
         if action == "start":
             recording.value = True
 
@@ -36,7 +36,7 @@ def test_source_order_survives_start_process_delayed_before_registration(
     child.start()
     try:
         monkeypatch.setattr(voice_input, "request", lambda *args, **kwargs: None)
-        monkeypatch.setattr(voice_input, "speech_command", lambda *args: None)
+        monkeypatch.setattr(voice_input, "speech_command", lambda *args, **kw: None)
         voice_input.control_speech(action)
         release.set()
         child.join(10)
@@ -65,13 +65,13 @@ def test_cancel_rejects_transcript_while_stt_cancel_is_still_running(qtbot, tmp_
     monkeypatch.setattr(
         voice_input, "request", lambda action, **kw: server.dispatch({"action": action, **kw})
     )
-    monkeypatch.setattr(voice_input, "speech_command", lambda *args: None)
+    monkeypatch.setattr(voice_input, "speech_command", lambda *args, **kw: None)
     token = prepare(server)
     # Delay GUI notification entirely. Durable revocation must suffice even when
-    # PushTalk's queued worker submits before its recorder cancel returns.
+    # the backend's queued worker submits before its recorder cancel returns.
     monkeypatch.setattr(voice_input, "request", lambda *args, **kwargs: None)
 
-    def speech(directory, action):
+    def speech(directory, action, **kwargs):
         assert action == "cancel"
         with pytest.raises(RuntimeError, match="interrupted"):
             server.dispatch({"action": "submit", "token": token, "text": "stale"})
@@ -95,7 +95,7 @@ def test_stale_gui_start_submit_and_cancel_cannot_affect_new_recording(
     monkeypatch.setattr(
         voice_input, "request", lambda action, **kw: server.dispatch({"action": action, **kw})
     )
-    monkeypatch.setattr(voice_input, "speech_command", lambda *args: None)
+    monkeypatch.setattr(voice_input, "speech_command", lambda *args, **kw: None)
     old = prepare(server)
     cancelled = voice_input.register_action("cancel")
     new = prepare(server)
@@ -131,7 +131,7 @@ def test_binding_reader_registers_release_before_delayed_worker(tmp_path, monkey
     events = []
     monkeypatch.setattr(voice_input, "request", lambda *args, **kw: events.append("gui"))
     monkeypatch.setattr(
-        voice_input, "speech_command", lambda directory, action: events.append(action)
+        voice_input, "speech_command", lambda directory, action, **kw: events.append(action)
     )
     # Deliberately run release first, then the delayed start worker.
     for fn, args in reversed(pending):
@@ -144,7 +144,7 @@ def test_event_stream_failure_cancels_and_fails_closed(tmp_path, monkeypatch):
     events = []
     monkeypatch.setattr(voice_input, "request", lambda *args, **kw: None)
     monkeypatch.setattr(
-        voice_input, "speech_command", lambda directory, action: events.append(action)
+        voice_input, "speech_command", lambda directory, action, **kw: events.append(action)
     )
     monkeypatch.setattr(
         voice_input.subprocess,
@@ -167,7 +167,7 @@ def blocked_cancel(directory, entered, release, results):
     voice_input.runtime_path = lambda: Path(directory)
     voice_input.request = lambda *args, **kw: None
 
-    def speech(directory, action):
+    def speech(directory, action, **kwargs):
         entered.set()
         assert release.wait(10)
 
@@ -186,7 +186,7 @@ def test_cross_process_cancel_revokes_before_slow_stt_returns(qtbot, tmp_path, m
     monkeypatch.setattr(
         voice_input, "request", lambda action, **kw: server.dispatch({"action": action, **kw})
     )
-    monkeypatch.setattr(voice_input, "speech_command", lambda *args: None)
+    monkeypatch.setattr(voice_input, "speech_command", lambda *args, **kw: None)
     token = prepare(server)
     context = multiprocessing.get_context("spawn")
     entered, release, results = context.Event(), context.Event(), context.Queue()
@@ -226,7 +226,7 @@ def test_hung_gui_does_not_delay_microphone_cancel(tmp_path, monkeypatch):
         raise TimeoutError("GUI timeout")
 
     monkeypatch.setattr(voice_input, "request", request)
-    monkeypatch.setattr(voice_input, "speech_command", lambda *args: stt_cancelled.set())
+    monkeypatch.setattr(voice_input, "speech_command", lambda *args, **kw: stt_cancelled.set())
     with ThreadPoolExecutor(max_workers=1) as executor:
         future = executor.submit(voice_input.control_speech, "cancel")
         try:
@@ -258,7 +258,7 @@ def test_startup_cancels_old_intent_and_ignores_unrelated_bindings(tmp_path, mon
     events = []
     monkeypatch.setattr(voice_input, "request", lambda *args, **kw: None)
     monkeypatch.setattr(
-        voice_input, "speech_command", lambda directory, action: events.append(action)
+        voice_input, "speech_command", lambda directory, action, **kw: events.append(action)
     )
     monkeypatch.setattr(
         voice_input.subprocess,
@@ -282,7 +282,7 @@ def test_listener_signal_shutdown_revokes_pending_start(tmp_path, monkeypatch):
     events = []
     monkeypatch.setattr(voice_input, "request", lambda *args, **kw: None)
     monkeypatch.setattr(
-        voice_input, "speech_command", lambda directory, action: events.append(action)
+        voice_input, "speech_command", lambda directory, action, **kw: events.append(action)
     )
 
     def stream():
@@ -311,7 +311,7 @@ def test_stream_child_cleanup_failure_still_cancels_capture(tmp_path, monkeypatc
     events = []
     monkeypatch.setattr(voice_input, "request", lambda *args, **kw: None)
     monkeypatch.setattr(
-        voice_input, "speech_command", lambda directory, action: events.append(action)
+        voice_input, "speech_command", lambda directory, action, **kw: events.append(action)
     )
 
     waits = []
@@ -349,11 +349,11 @@ def test_submit_cli_keeps_original_identity_across_new_recording(qtbot, tmp_path
     qtbot.addWidget(window)
     server = voice_input.VoiceServer(tmp_path / "voice.sock", window)
     monkeypatch.setattr(voice_input, "runtime_path", lambda: tmp_path)
-    monkeypatch.setattr(voice_input, "speech_command", lambda *args: None)
+    monkeypatch.setattr(voice_input, "speech_command", lambda *args, **kw: None)
     monkeypatch.setattr(
         voice_input, "request", lambda action, **kw: server.dispatch({"action": action, **kw})
     )
-    prepare(server)
+    original = prepare(server)
     newer = []
 
     def request(action, text=None, **kw):
@@ -364,7 +364,7 @@ def test_submit_cli_keeps_original_identity_across_new_recording(qtbot, tmp_path
         server.dispatch({"action": action, "text": text, **kw})
 
     monkeypatch.setattr(voice_input, "request", request)
-    monkeypatch.setattr("sys.argv", ["studio-buddy-voice", "submit"])
+    monkeypatch.setattr("sys.argv", ["studio-buddy-voice", "submit", "--token", original])
     monkeypatch.setattr("sys.stdin", SimpleNamespace(buffer=io.BytesIO(b"old callback")))
     assert voice_input.main() == 1
     assert not window.messages
