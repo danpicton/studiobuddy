@@ -1,0 +1,13 @@
+[Unit]
+Description=Studio Buddy background companion
+After=graphical-session.target
+
+[Service]
+Type=exec
+ExecStart=%h/.local/bin/studio-buddy --background
+Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=graphical-session.target

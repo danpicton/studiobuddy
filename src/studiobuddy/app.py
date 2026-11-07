@@ -27,6 +27,16 @@ from .speech import Piper, Player, Speech, SpeechError
 from .storage import Store
 
 
+class StatusLabel(QLabel):
+    textChanged = Signal(str)
+
+    def setText(self, text):
+        changed = text != self.text()
+        super().setText(text)
+        if changed:
+            self.textChanged.emit(text)
+
+
 class MessageInput(QPlainTextEdit):
     submitted = Signal()
 
@@ -106,7 +116,7 @@ class Window(QMainWindow):
         self.layout.addWidget(self.history)
         self.input = MessageInput()
         self.input.setPlaceholderText(
-            "What's making a good noise? Type, paste, or hold F9 with PushTalk."
+            "What's making a good noise? Type here, or hold F10 for voice."
         )
         self.input.setMaximumHeight(110)
         self.layout.addWidget(self.input)
@@ -120,7 +130,7 @@ class Window(QMainWindow):
         self.stop = QPushButton("Stop / cancel")
         self.stop.clicked.connect(self.cancel)
         self.layout.addWidget(self.stop)
-        self.status = QLabel("Ready")
+        self.status = StatusLabel("Ready")
         self.layout.addWidget(self.status)
         actions = QHBoxLayout()
         for label, callback in [
@@ -375,15 +385,17 @@ class Window(QMainWindow):
         bar = self.history.verticalScrollBar()
         bar.setValue(bar.maximum())
 
-    def send_message(self):
-        text = self.input.toPlainText().strip()
+    def send_message(self, checked=False, *, text=None):
+        from_editor = text is None
+        text = (self.input.toPlainText() if from_editor else text).strip()
         if not text:
             return
         self.cancel()
         self.store.message(self.session_id, "user", text)
         self.messages.append({"role": "user", "content": text})
         self.store.update_goal(self.session_id, self.goal.text())
-        self.input.clear()
+        if from_editor:
+            self.input.clear()
         self.render()
         if isinstance(self.ai, OpenAIBackend):
             used = int(self.store.state(f"requests:{self.session_id}") or 0)
@@ -439,6 +451,10 @@ class Window(QMainWindow):
             )
 
     def closeEvent(self, event):
+        if getattr(self, "background", False):
+            self.hide()
+            event.ignore()
+            return
         if self.closed:
             event.accept()
             return
@@ -459,10 +475,47 @@ def main():
     from pathlib import Path
 
     data = Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local/share")) / "studio-buddy"
+    from dataclasses import replace
+
+    from PySide6.QtCore import QLockFile
+
+    from .voice_input import VoiceServer, request, runtime_path
+
+    try:
+        path = runtime_path() / "voice.sock"
+        lock = QLockFile(str(path) + ".lock")
+        if not lock.tryLock(0):
+            request("show")
+            return 0
+    except (OSError, RuntimeError):
+        print("Cannot reach Studio Buddy. Check XDG_RUNTIME_DIR and the service.", file=sys.stderr)
+        return 1
     window = Window(
         ai=MockAI() if "--mock" in sys.argv else OpenAIBackend(),
         store=Store(data / "memory.sqlite"),
         settings_path=config_path(),
     )
-    window.show()
-    sys.exit(app.exec())
+    try:
+        server = VoiceServer(path, window, lock=lock)
+    except RuntimeError as error:
+        window.close()
+        lock.unlock()
+        print(str(error), file=sys.stderr)
+        return 1
+    window.background = "--background" in sys.argv
+    app.setQuitOnLastWindowClosed(not window.background)
+    if window.background:
+        from PySide6.QtCore import QProcess
+
+        window.status.textChanged.connect(
+            lambda text: QProcess.startDetached("notify-send", ["Studio Buddy", text])
+        )
+        window.apply_settings(replace(window.settings, voice_mode=True), save=False)
+    else:
+        window.show()
+    try:
+        app.exec()
+    finally:
+        server.close()
+        window.background = False
+        window.close()

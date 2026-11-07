@@ -6,6 +6,7 @@ requires-python = ">=3.11"
 dependencies = ["PySide6>=6.8,<7", "openai>=2,<3", "httpx>=0.28,<1", "mcp>=1.20,<2"]
 [project.scripts]
 studio-buddy = "studiobuddy.app:main"
+studio-buddy-voice = "studiobuddy.voice_input:main"
 [dependency-groups]
 dev = ["pytest>=8", "pytest-qt>=4", "pytest-asyncio>=1", "ruff>=0.14"]
 [build-system]

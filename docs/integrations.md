@@ -25,3 +25,12 @@ Cancellation closes the HTTP stream; file playback is a cancellable ffplay child
 All network workers run outside Qt's UI thread. OpenAI never receives a tools schema.
 No key values are written in errors, config or logs. MCP resource text stays in the
 user context channel and is explicitly marked untrusted, bounded and single-request.
+
+## Dedicated PushTalk integration
+Inspected https://github.com/danpicton/pushtalk main: existing `sttd --type-cmd`
+sends UTF-8 transcript bytes on stdin; `sttctl --socket` controls an independent
+instance. No upstream modifications. Dedicated sockets/state avoid F9 conflicts.
+The dedicated instance uses small.en/CPU/int8, four threads, no pre-roll; model
+download cache is shared, model RAM and mic streams are separate. No paid STT.
+Studio Buddy's private local socket uses bounded newline JSON and a lock file;
+no TCP listener, focus injection, model tools or automatic memory writes.

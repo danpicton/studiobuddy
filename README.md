@@ -2,8 +2,10 @@
 
 A native, local-first musical companion for Renoise. Chat about the loop you have,
 try one next experiment, remember the good bits, and pick up where you left off.
-Python 3.11+, PySide6, SQLite, OpenAI Responses, and optional Piper / ElevenLabs /
-Hume speech. No browser UI, microphone service, audio listening or Renoise editing.
+Python 3.11+, PySide6, SQLite, OpenAI Responses, and Piper / ElevenLabs / Hume
+speech. Background voice interaction via a dedicated, unmodified PushTalk daemon;
+the native UI remains available for settings, projects, notes and text conversation.
+No Renoise editing.
 
 ## Install on Arch Linux / Sway
 
@@ -51,10 +53,17 @@ A desktop launcher must inherit the variable from your session or your own secur
 credential launcher. Settings shows only whether a key is present, never its value.
 A ChatGPT subscription does **not** include API billing. Configure an OpenAI API
 account and billing separately. Default model: `gpt-4.1-mini`, changeable in Settings.
+Reasoning effort sits beside the model: `default` omits the API parameter; other
+choices are `none`, `minimal`, `low`, `medium`, `high`, `xhigh`. Support depends on
+the model. For example, GPT-4.1 models should use `default`; choose a reasoning
+model before requesting an explicit effort. Reasoning consumes output tokens too: the
+300-token default may produce no visible answer with a reasoning model; increase
+the output limit and/or lower effort if needed. Unsupported model/effort combinations
+produce a safe request error and can be corrected in Settings.
 
 Type or paste into the message field and click Send or press **Ctrl+Enter**.
 Enter alone adds a newline. Replies stay short and suggest one experiment; the user
-judges taste. Studio Buddy never hears your audio.
+judges taste. Voice transcripts follow the same conversation and memory path.
 
 Create/select projects and sessions at the top; edit the current goal beneath them.
 **I'm stuck** and **Another idea** request a next experiment. **Remember this** saves
@@ -117,26 +126,83 @@ Uses the official `/v0/tts/file` API with WAV output and one generation. Hume's
 expressive description is distinct from ElevenLabs stability. Voice IDs are entered
 manually; this release does not fetch cloud voice catalogues.
 
-## PushTalk stays independent
+## Background voice on F10 (recommended)
 
-Focus the Studio Buddy message field, hold your **existing F9** binding, speak,
-release, inspect the transcribed text, then Send / Ctrl+Enter. PushTalk's `wtype`
-output goes into the native focused editor. Studio Buddy does not install or change
-PushTalk, its configuration, its daemon, or its bindings, and does not capture a mic.
-Typing and pasting work without PushTalk. Actual wtype/F9 injection needs Sway testing.
+Install [PushTalk](https://github.com/danpicton/pushtalk) normally so `sttd` and
+`sttctl` are on PATH. No changes to PushTalk source, configuration, `sttd.service`
+or F9 are required. We reuse its existing `--socket`, `--state-file` and
+`--type-cmd` interfaces in a **second instance**. The existing daemon injects text
+with wtype; the Studio Buddy instance sends stdin transcripts to
+`studio-buddy-voice submit` through a private local socket. No window focus needed.
 
-Optional Sway snippets, to add yourself if desired (choose unused bindings):
+Recommended STT matches PushTalk: faster-whisper / CTranslate2, CPU, int8,
+`small.en` for English. The supplied service uses four threads to leave room for
+music, and zero pre-roll to reduce pickup of Buddy's previous reply. Change these
+in the Studio Buddy service only. For other languages use a multilingual model
+and `--language auto`. Both instances share Hugging Face's downloaded model cache,
+but each loads its own model in RAM and opens its own mic stream. Check PipeWire
+allows both. This does not reuse the already-running F9 daemon's in-memory model;
+that daemon has no per-request transcript destination API. No backend fork needed.
 
-```sway
-bindsym $mod+Shift+b exec studio-buddy
-bindsym $mod+b [app_id="studio-buddy"] focus
-bindsym $mod+Ctrl+b [app_id="studio-buddy"] move scratchpad
-bindsym $mod+Mod1+b [app_id="studio-buddy"] scratchpad show
+First open the UI, select your project/session, configure your model and a working
+Piper voice (or chosen cloud voice), and use Test Voice. Then close the regular app
+and install the supplied units:
+
+```sh
+uv tool install --reinstall .
+mkdir -p ~/.config/systemd/user
+cp packaging/studio-buddy.service packaging/studio-buddy-stt.service ~/.config/systemd/user/
+systemctl --user daemon-reload
 ```
 
-Launch once before using focus/show. These never use F9. The window is not always
-on top and uses no X11 window-management calls. Qt uses Wayland in a normal Sway
-session; if needed launch with `QT_QPA_PLATFORM=wayland studio-buddy`.
+Arrange for `studio-buddy.service` to receive `OPENAI_API_KEY` through your existing
+secure session/credential mechanism. The supplied unit contains no credentials;
+keys exported in an ordinary shell are not automatically inherited by systemd.
+Add [packaging/studio-buddy.sway](packaging/studio-buddy.sway) to your Sway config
+and reload Sway, or start the units after importing the session environment:
+
+```sh
+systemctl --user import-environment WAYLAND_DISPLAY XDG_CURRENT_DESKTOP SWAYSOCK
+systemctl --user start studio-buddy.service studio-buddy-stt.service
+```
+
+Bindings provided for you to merge yourself:
+
+```sway
+bindsym --no-repeat F10 exec studio-buddy-voice start
+bindsym --release F10 exec studio-buddy-voice stop
+bindsym $mod+F10 exec studio-buddy-voice show
+bindsym $mod+Shift+F10 exec studio-buddy-voice cancel
+```
+
+Hold F10, speak, release: the transcript is submitted automatically to the current
+session and the reply is spoken. Starting a recording interrupts Buddy's pending
+reply/playback. Wait for transcription before recording again; overlapping jobs are
+refused. Lost release auto-stops at 120 seconds. Changing sessions, sending text or
+cancelling invalidates the pending transcript. Unsaved editor text remains intact.
+Do not change projects while dictating; select the intended project first in the UI.
+
+`studio-buddy --background` starts hidden and enables speech for that launch using
+the saved provider. Normal launch shows the UI; launching again shows the existing
+instance. Closing the background window hides it and keeps the companion running.
+`studio-buddy-voice show` / `hide` control the window; `cancel` interrupts both capture
+and the response. Desktop notifications show response/error status (requires
+`notify-send` and a notification daemon). Conversation text/errors remain in the UI.
+To stop both background services:
+
+```sh
+systemctl --user stop studio-buddy-stt.service studio-buddy.service
+```
+
+`studio-buddy-voice quit` exits the app; systemd also stops its dependent STT unit.
+You can still focus the editor and use existing F9 dictation, inspect it and submit
+with Ctrl+Enter. Studio Buddy does not install bindings or start microphone capture
+itself: capture runs only when you explicitly start its separate PushTalk instance.
+PushTalk keeps the mic open while its daemon runs, even between keypresses; it logs
+transcript excerpts (and full transcripts on injection failures) to its journal.
+Review retention there if conversations are sensitive. Check status with
+`sttctl --socket "$XDG_RUNTIME_DIR/studio-buddy/sttd.sock" status` and logs with
+`journalctl --user -u studio-buddy.service -u studio-buddy-stt.service`.
 
 ## Optional Renoise context — compatibility limitation
 
@@ -201,9 +267,9 @@ claimed from mocks, and [API references](docs/integrations.md) for sources.
 - Invalid TOML: repair config using the example. Keep a backup; the app does not
   silently overwrite malformed settings. SQLite corruption requires restoring backup.
 - MCP unavailable: confirm protocol/resource support and endpoint; ordinary chat works.
-- New instance opens instead of showing one: use focus/scratchpad binding after launch;
-  this version does not implement a single-instance DBus service.
+- Voice unavailable: check both Studio Buddy services, the selected voice, and
+  `XDG_RUNTIME_DIR`. Keep the directory private (0700). Existing F9 needs no changes.
 
-Known limitations: Arch/Sway, actual speech output, paid provider calls, PushTalk F9
+Known limitations: Arch/Sway, microphone capture, actual speech output, paid provider calls, F9/F10
 and the specified Renoise tool remain live smoke tests. No cloud voice catalogue,
 partial-audio playback, automatic summarization or hard currency spending cap.

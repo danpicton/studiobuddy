@@ -1,0 +1,22 @@
+# Requires an installed, unmodified danpicton/pushtalk (sttd and sttctl).
+# Deliberately independent of sttd.service and all existing F9 configuration.
+[Unit]
+Description=Studio Buddy dedicated PushTalk speech recognition
+Requires=studio-buddy.service
+After=studio-buddy.service
+PartOf=studio-buddy.service
+
+[Service]
+Type=exec
+Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin
+# RuntimeDirectory ensures the private parent exists even during app startup.
+RuntimeDirectory=studio-buddy
+RuntimeDirectoryMode=0700
+RuntimeDirectoryPreserve=yes
+ExecStart=%h/.local/bin/sttd --model small.en --compute-type int8 --threads 4 --preroll 0 --max-duration 120 --socket %t/studio-buddy/sttd.sock --state-file %t/studio-buddy/sttd.state --type-cmd 'studio-buddy-voice submit' --no-trailing-space
+Restart=on-failure
+RestartSec=2
+MemoryMax=6G
+
+[Install]
+WantedBy=graphical-session.target

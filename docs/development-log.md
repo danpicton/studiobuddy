@@ -102,3 +102,25 @@ use UV_CACHE_DIR=/workspace/work/uv-cache. Added persisted model-specific effort
 Settings selector, runtime application and optional Responses reasoning payload.
 GREEN / REFACTOR / regression: ruff format; 38 tests passed; ruff check passed.
 Paid model compatibility is a manual check; default omits reasoning for existing models.
+
+## 13 — Background voice entry point
+RED: 3 voice behavioural tests failed with missing voice_input module.
+Reusing PushTalk main (inspected README, daemon and ctl): separate sttd with its
+existing --socket / --state-file / --type-cmd options. No PushTalk modifications
+and no microphone capture executed in development. User request supersedes the
+old no-microphone product scope; capture remains in the separate PushTalk service.
+
+GREEN: initial voice tests passed; expanded regression 45 passed. ruff identified
+three issues (exception type and explicit subprocess check), corrected. Build passed.
+Real CLI smoke then found a hidden-launch crash: QLabel has no textChanged signal.
+Added StatusLabel signal and a regression test before retrying the process smoke.
+Process smoke exposed quit acknowledgement being cut off by shutdown. Flush the
+reply and defer quitting until the next Qt turn. Retried from a fresh isolated XDG
+state: hidden --mock launch, transcript IPC, SQLite conversation, second-instance
+show, hide and quit all passed. No capture or paid calls. Notifications require a
+real desktop. Added status-signal and CLI dedicated-socket/ordering regressions.
+Final REFACTOR / regression: 47 tests passed; ruff check and git diff --check passed;
+uv build produced wheel and sdist. Live Arch/Sway F10/F9 coexistence, PipeWire mic,
+CPU contention during music, notification display, actual speech and paid model
+reasoning remain explicitly unverified. Service files are supplied, not installed
+or started. PushTalk checkout used for inspection only; upstream is unmodified.

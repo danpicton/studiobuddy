@@ -5,9 +5,18 @@ Use a disposable musical session. No project edits should occur.
 1. Arch/Sway: install, launch, type, paste, Ctrl+Enter; confirm readable UI at your
    scale, app_id with `swaymsg -t get_tree`, focus/scratchpad bindings and no always-on-top.
 2. Existing PushTalk: focus input, hold/release existing F9, verify dictation and edit
-   before sending. Verify its services/config/bindings are unchanged; no second mic.
+   before sending. Verify its services/config/bindings are unchanged.
+   Start the separate studio-buddy services and verify F10 while Renoise has focus:
+   automatic submit, spoken answer, notifications, show/hide, close-to-background,
+   unchanged editor draft. Check simultaneous mic access and resource usage. Rapid
+   repeat F10 while transcribing must refuse overlap; switch sessions during capture
+   and confirm stale transcript is rejected. Test cancel, lost-release watchdog, no
+   speech, service restart and unavailable STT. Verify the chosen PipeWire mic.
+   No microphone capture was run during development.
 3. OpenAI: with your own API billing/key, send one message, verify answer and token
-   count. Try wrong key / exhausted quota only in an isolated launch, confirm safe error.
+   count. Select a supported reasoning model/effort, increase output budget if needed,
+   verify a reply and persistence after restart. Default effort with gpt-4.1-mini
+   must keep working. Try wrong key / exhausted quota only in an isolated launch, confirm safe error.
 4. Piper: install a licensed model + JSON, select it, Test Voice; verify normal audio
    output. While generating/playing press Stop, send another message and switch to Text.
    Old speech must never begin/resume. Remove model temporarily and verify text survives.
