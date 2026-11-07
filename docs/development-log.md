@@ -42,3 +42,9 @@ voice settings, missing credentials and rate limits. Official elevenlabs-python
 reference consulted. Audio is downloaded asynchronously in bounded chunks, then
 played; cancellation closes HTTP stream. REFACTOR: shared bounded download helper;
 regression 14 passed. Settings wiring follows in packaging/settings slice.
+
+## 8 — Hume adapter
+RED: Hume import failed (2 tests). GREEN: 16 passed. Verified distinct /v0/tts/file
+payload, voice ID, acting description, WAV format and authentication error handling.
+Source: official HumeAI/hume-python-sdk tts/raw_client.py and posted_utterance.py.
+REFACTOR: format; regression 16 passed. Live Hume/ElevenLabs calls not made.

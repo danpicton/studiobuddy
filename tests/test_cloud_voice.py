@@ -26,3 +26,35 @@ async def test_eleven_missing_key_and_rate_limit(monkeypatch):
     voice = ElevenLabs("voice", transport=httpx.MockTransport(lambda r: httpx.Response(429)))
     with pytest.raises(SpeechError, match="rate limit"):
         await voice.generate("hello")
+
+
+async def test_hume_distinct_expressive_request(monkeypatch):
+    from studiobuddy.providers import Hume
+
+    monkeypatch.setenv("HUME_API_KEY", "test")
+
+    def handle(request):
+        assert request.url.path == "/v0/tts/file"
+        assert request.headers["X-Hume-Api-Key"] == "test"
+        data = json.loads(request.content)
+        assert data["utterances"][0]["voice"] == {"id": "voice-2"}
+        assert data["utterances"][0]["description"] == "Warm and wry"
+        assert data["format"] == {"type": "wav"}
+        return httpx.Response(200, content=b"wav")
+
+    assert (
+        await Hume(
+            "voice-2", description="Warm and wry", transport=httpx.MockTransport(handle)
+        ).generate("hello")
+        == b"wav"
+    )
+
+
+async def test_hume_auth_failure(monkeypatch):
+    from studiobuddy.providers import Hume
+
+    monkeypatch.setenv("HUME_API_KEY", "test")
+    with pytest.raises(SpeechError, match="authentication"):
+        await Hume("v", transport=httpx.MockTransport(lambda r: httpx.Response(401))).generate(
+            "hello"
+        )

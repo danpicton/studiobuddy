@@ -58,3 +58,31 @@ class ElevenLabs:
             },
             self.transport,
         )
+
+
+class Hume:
+    def __init__(self, voice, description="Warm, conversational", speed=1.0, transport=None):
+        self.voice, self.description = voice, description
+        self.speed, self.transport = speed, transport
+
+    async def generate(self, text):
+        if not self.voice:
+            raise SpeechError("Choose a Hume voice ID in Settings.")
+        return await download(
+            "https://api.hume.ai/v0/tts/file",
+            "HUME_API_KEY",
+            "X-Hume-Api-Key",
+            {
+                "utterances": [
+                    {
+                        "text": text,
+                        "voice": {"id": self.voice},
+                        "description": self.description,
+                        "speed": self.speed,
+                    }
+                ],
+                "format": {"type": "wav"},
+                "num_generations": 1,
+            },
+            self.transport,
+        )
