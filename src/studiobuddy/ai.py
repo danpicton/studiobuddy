@@ -1,4 +1,5 @@
 import asyncio
+
 from .personality import SYSTEM_PROMPT
 
 
@@ -25,6 +26,7 @@ class OpenAIBackend:
 
     async def reply(self, messages, context=""):
         import os
+
         from openai import AsyncOpenAI, AuthenticationError, RateLimitError
 
         if self.requests >= self.request_limit:
@@ -60,7 +62,7 @@ class OpenAIBackend:
             ) from None
         except AIError:
             raise
-        except Exception:
+        except Exception:  # noqa: BLE001 - sanitize errors at external service boundary
             raise AIError(
                 "OpenAI connection or request failed. Check network and model settings."
             ) from None

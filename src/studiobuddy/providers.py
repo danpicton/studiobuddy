@@ -2,7 +2,9 @@
 
 import os
 from urllib.parse import quote
+
 import httpx
+
 from .speech import SpeechError
 
 
@@ -11,7 +13,7 @@ async def download(url, key_name, header, payload, transport=None):
     if not key:
         raise SpeechError(f"Set {key_name} for the selected voice provider.")
     try:
-        async with httpx.AsyncClient(timeout=45, transport=transport) as client:
+        async with httpx.AsyncClient(timeout=45, transport=transport) as client:  # noqa: SIM117
             async with client.stream("POST", url, headers={header: key}, json=payload) as response:
                 if response.status_code in (401, 403):
                     raise SpeechError(

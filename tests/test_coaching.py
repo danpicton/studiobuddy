@@ -1,5 +1,6 @@
-from unittest.mock import AsyncMock
 from types import SimpleNamespace
+from unittest.mock import AsyncMock
+
 from studiobuddy.ai import OpenAIBackend
 
 

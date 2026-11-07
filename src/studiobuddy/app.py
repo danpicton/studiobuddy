@@ -1,26 +1,30 @@
 import sys
+
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QApplication,
-    QMainWindow,
-    QWidget,
-    QVBoxLayout,
-    QTextBrowser,
-    QPlainTextEdit,
-    QPushButton,
+    QCheckBox,
     QComboBox,
     QHBoxLayout,
     QInputDialog,
-    QCheckBox,
     QLabel,
     QLineEdit,
+    QMainWindow,
+    QPlainTextEdit,
+    QPushButton,
+    QTextBrowser,
+    QVBoxLayout,
+    QWidget,
 )
-from .ai import MockAI, OpenAIBackend, AIError
-from .runner import Runner
+
+from .ai import AIError, MockAI, OpenAIBackend
 from .memory_ui import NotesDialog
-from .renoise import Renoise, ContextError
+from .renoise import Renoise
+from .runner import Runner
+from .settings import Settings, config_path
+from .settings_ui import SettingsDialog
+from .speech import Piper, Player, Speech, SpeechError
 from .storage import Store
-from .speech import Speech, Piper, Player, SpeechError
 
 
 class MessageInput(QPlainTextEdit):
@@ -38,11 +42,13 @@ class MessageInput(QPlainTextEdit):
 
 
 class Window(QMainWindow):
-    def __init__(self, ai=None, store=None):
+    def __init__(self, ai=None, store=None, settings_path=None):
         super().__init__()
         self.setWindowTitle("Studio Buddy")
         self.resize(540, 680)
         self.ai = ai or MockAI()
+        self.settings_path = settings_path
+        self.settings = Settings.load(settings_path) if settings_path else Settings()
         self.store = store or Store()
         projects = self.store.projects()
         self.project_id = int(
@@ -109,11 +115,7 @@ class Window(QMainWindow):
         self.input.submitted.connect(self.send_message)
         self.layout.addWidget(self.send)
         self.voice = QCheckBox("Voice replies · Piper (local)")
-        self.voice.toggled.connect(
-            lambda enabled: self.speech_runner.submit(
-                0, self.speech.configure(enabled, self.speech.provider, self.speech.fallback)
-            )
-        )
+        self.voice.toggled.connect(self.set_voice_mode)
         self.layout.addWidget(self.voice)
         self.stop = QPushButton("Stop / cancel")
         self.stop.clicked.connect(self.cancel)
@@ -155,6 +157,87 @@ class Window(QMainWindow):
         self.layout.addLayout(context_row)
         self.refresh_selectors()
         self.select_session(self.session_id)
+        settings_button = QPushButton("Settings")
+        settings_button.clicked.connect(self.open_settings)
+        self.layout.addWidget(settings_button)
+        self.apply_settings(self.settings, save=False)
+
+    def open_settings(self):
+        SettingsDialog(
+            self.settings,
+            self.settings_path or "temporary test settings",
+            self.apply_settings,
+            self.test_voice,
+            self,
+        ).exec()
+
+    def test_voice(self):
+        async def test():
+            await self.speech.configure(
+                True,
+                self.settings.speech_provider(),
+                Piper(self.settings.piper_model) if self.settings.fallback == "piper" else None,
+            )
+            try:
+                await self.speech.say(
+                    "Keep that lovely loop. Let's see what happens when the drums disappear."
+                )
+            finally:
+                self.speech.voice = self.settings.voice_mode
+
+        self.speech_runner.submit(self.token, test())
+
+    def apply_settings(self, settings, save=True):
+        settings.validate()
+        if save and self.settings_path:
+            settings.save(self.settings_path)
+        self.cancel()
+        self.context_token += 1
+        self.renoise_context = ""
+        self.resources.clear()
+        self.settings = settings
+        if isinstance(self.ai, OpenAIBackend):
+            self.ai.model = settings.model
+            self.ai.request_limit = settings.request_limit
+            self.ai.max_output_tokens = settings.max_output_tokens
+        self.renoise = Renoise(settings.mcp_url) if settings.mcp_enabled else None
+        self.context_status.setText(
+            "Renoise · disconnected" if self.renoise else "Renoise · disabled"
+        )
+        self.voice.blockSignals(True)
+        self.voice.setChecked(settings.voice_mode)
+        self.voice.setText(
+            "Voice replies · "
+            + settings.provider
+            + (" (external service)" if settings.provider != "piper" else " (local)")
+        )
+        self.voice.blockSignals(False)
+        self.speech_runner.submit(
+            0,
+            self.speech.configure(
+                settings.voice_mode,
+                settings.speech_provider(),
+                Piper(settings.piper_model) if settings.fallback == "piper" else None,
+            ),
+        )
+        self.setStyleSheet(
+            "QWidget { background: #20242b; color: #e3e7ec; font-size: 13px; } QPlainTextEdit, QTextBrowser, QLineEdit, QComboBox { background: #171a20; border: 1px solid #46515c; border-radius: 5px; padding: 7px; } QPushButton { background: #34434b; border: 1px solid #566772; border-radius: 5px; padding: 7px; } QPushButton:hover { background: #46615f; }"
+            if settings.theme == "dark"
+            else ""
+        )
+
+    def set_voice_mode(self, enabled):
+        self.settings.voice_mode = enabled
+        if self.settings_path:
+            self.settings.save(self.settings_path)
+        self.speech_runner.submit(
+            0,
+            self.speech.configure(
+                enabled,
+                self.settings.speech_provider(),
+                Piper(self.settings.piper_model) if self.settings.fallback == "piper" else None,
+            ),
+        )
 
     def connect_renoise(self):
         if not self.renoise:
@@ -298,8 +381,18 @@ class Window(QMainWindow):
         self.cancel()
         self.store.message(self.session_id, "user", text)
         self.messages.append({"role": "user", "content": text})
+        self.store.update_goal(self.session_id, self.goal.text())
         self.input.clear()
         self.render()
+        if isinstance(self.ai, OpenAIBackend):
+            used = int(self.store.state(f"requests:{self.session_id}") or 0)
+            self.ai.requests = used
+            if used >= self.settings.request_limit:
+                self.status.setText(
+                    "Session request limit reached. Adjust Settings or start a new session."
+                )
+                return
+            self.store.state(f"requests:{self.session_id}", used + 1)
         self.status.setText("Thinking…")
         self.pending = self.runner.submit(
             self.token,
@@ -308,10 +401,15 @@ class Window(QMainWindow):
                 self.store.context(self.project_id, self.session_id) + "\n" + self.renoise_context,
             ),
         )
+        if self.renoise_context:
+            self.renoise_context = ""
+            self.context_status.setText("Renoise · snapshot used; read again to refresh")
 
     def cancel(self):
         self.speech_runner.submit(0, self.speech.stop())
         self.token += 1
+        if hasattr(self, "status"):
+            self.status.setText("Ready · interrupted")
         if self.pending:
             self.pending.cancel()
 
@@ -355,6 +453,7 @@ class Window(QMainWindow):
 def main():
     app = QApplication(sys.argv)
     app.setApplicationName("studio-buddy")
+    app.setDesktopFileName("studio-buddy")
     import os
     from pathlib import Path
 
@@ -362,6 +461,7 @@ def main():
     window = Window(
         ai=MockAI() if "--mock" in sys.argv else OpenAIBackend(),
         store=Store(data / "memory.sqlite"),
+        settings_path=config_path(),
     )
     window.show()
     sys.exit(app.exec())

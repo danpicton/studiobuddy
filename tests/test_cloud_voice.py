@@ -1,6 +1,8 @@
 import json
+
 import httpx
 import pytest
+
 from studiobuddy.providers import ElevenLabs
 from studiobuddy.speech import SpeechError
 

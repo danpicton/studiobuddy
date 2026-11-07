@@ -1,8 +1,9 @@
 """Conservative MCP resource client. Never lists or invokes tools."""
 
 import asyncio
-from urllib.parse import urlsplit
 from datetime import timedelta
+from urllib.parse import urlsplit
+
 import httpx
 from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
@@ -41,24 +42,20 @@ class Renoise:
     async def fetch(self, uri=None):
         try:
             async with asyncio.timeout(8):
-                async with httpx.AsyncClient(
-                    timeout=5, trust_env=False, follow_redirects=False
-                ) as client:
-                    async with streamable_http_client(self.url, http_client=client) as (
+                async with (
+                    httpx.AsyncClient(timeout=5, trust_env=False, follow_redirects=False) as client,
+                    streamable_http_client(self.url, http_client=client) as (
                         read,
                         write,
                         _,
-                    ):
-                        async with ClientSession(
-                            read, write, read_timeout_seconds=timedelta(seconds=5)
-                        ) as session:
-                            await session.initialize()
-                            return (
-                                await self.read(session, uri)
-                                if uri
-                                else await self.resources(session)
-                            )
-        except Exception:
+                    ),
+                    ClientSession(
+                        read, write, read_timeout_seconds=timedelta(seconds=5)
+                    ) as session,
+                ):
+                    await session.initialize()
+                    return await self.read(session, uri) if uri else await self.resources(session)
+        except Exception:  # noqa: BLE001 - sanitize errors at external service boundary
             raise ContextError(
                 "Renoise MCP unavailable or resource access unsupported. Chat still works."
             ) from None

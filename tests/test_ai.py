@@ -1,7 +1,9 @@
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
+
 import pytest
-from studiobuddy.ai import OpenAIBackend, AIError
+
+from studiobuddy.ai import AIError, OpenAIBackend
 
 
 async def test_responses_and_limits():

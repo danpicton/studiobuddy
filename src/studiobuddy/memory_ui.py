@@ -1,13 +1,13 @@
 from PySide6.QtWidgets import (
-    QDialog,
-    QVBoxLayout,
-    QHBoxLayout,
-    QListWidget,
     QComboBox,
-    QPlainTextEdit,
-    QLineEdit,
-    QPushButton,
+    QDialog,
+    QHBoxLayout,
     QLabel,
+    QLineEdit,
+    QListWidget,
+    QPlainTextEdit,
+    QPushButton,
+    QVBoxLayout,
 )
 
 

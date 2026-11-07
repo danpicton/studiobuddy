@@ -1,7 +1,9 @@
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
+
 import pytest
-from studiobuddy.renoise import Renoise, ContextError
+
+from studiobuddy.renoise import ContextError, Renoise
 
 
 async def test_only_selected_advertised_resource_is_read():

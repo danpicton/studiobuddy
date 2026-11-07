@@ -65,3 +65,12 @@ GitHub zakhap/renoise-mcp documents write tools / evaluate_lua only; these are
 intentionally unsupported. Resource-only adapter is implemented, but compatibility
 with the user's ReMCP server and song/note resources remains unverified. No tool
 names or data capabilities invented. REFACTOR: format; regression 21 passed.
+
+## 11a — Settings, integration and hardening
+RED: settings module absent. Added restart-safe TOML, runtime provider selection,
+Test Voice, external-text disclosure, local/text-only fallback and theme/MCP settings.
+Additional RED: a supposedly one-request Renoise snapshot leaked into the next
+request; now consumed once. Stale-AI cancellation test passed without changes.
+GREEN: 26 passed. REFACTOR: formatting/import organization and explicit exception
+boundary comments; ruff clean, regression 26 passed. Request counts persist per
+session. Secrets are never written to settings. Native packaging/docs next.

@@ -2,6 +2,7 @@
 
 import asyncio
 import threading
+
 from PySide6.QtCore import QObject, Signal
 
 
@@ -25,7 +26,7 @@ class Runner(QObject):
                 return
             try:
                 result = f.result()
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 - marshal worker failures to the UI
                 self.done.emit(token, None, exc)
             else:
                 self.done.emit(token, result, None)

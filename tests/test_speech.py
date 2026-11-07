@@ -1,6 +1,8 @@
 import asyncio
+
 import pytest
-from studiobuddy.speech import Speech, Piper, SpeechError
+
+from studiobuddy.speech import Piper, Speech, SpeechError
 
 
 class Player:
