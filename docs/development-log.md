@@ -23,3 +23,9 @@ RED: missing goal widget and insufficient personality instructions (2 failures).
 Initial GREEN run exposed repeated-close teardown errors; made shutdown idempotent.
 GREEN: 8 passed after correction. Editable goal persists; personality is a dedicated maintainable
 module, separate from untrusted session data. REFACTOR: format; regression 8 passed.
+
+## 5 — Focused dictation-compatible input
+RED: Ctrl+Enter submission timed out. Initial QShortcut did not handle the focused
+editor reliably in offscreen Qt; moved handling to the editor's key event.
+GREEN: 9 passed; REFACTOR: format, regression 9 passed. Native paste is verified;
+actual wtype/F9 remains an Arch/Sway smoke test. PushTalk was not modified.

@@ -1,4 +1,5 @@
 import sys
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QApplication,
     QMainWindow,
@@ -13,6 +14,20 @@ from PySide6.QtWidgets import (
 from .ai import MockAI, OpenAIBackend, AIError
 from .runner import Runner
 from .storage import Store
+
+
+class MessageInput(QPlainTextEdit):
+    submitted = Signal()
+
+    def keyPressEvent(self, event):
+        if (
+            event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter)
+            and event.modifiers() & Qt.KeyboardModifier.ControlModifier
+        ):
+            self.submitted.emit()
+            event.accept()
+        else:
+            super().keyPressEvent(event)
 
 
 class Window(QMainWindow):
@@ -52,7 +67,7 @@ class Window(QMainWindow):
         self.layout.addWidget(self.goal)
         self.history = QTextBrowser()
         self.layout.addWidget(self.history)
-        self.input = QPlainTextEdit()
+        self.input = MessageInput()
         self.input.setPlaceholderText(
             "What's making a good noise? Type, paste, or hold F9 with PushTalk."
         )
@@ -60,6 +75,7 @@ class Window(QMainWindow):
         self.layout.addWidget(self.input)
         self.send = QPushButton("Send")
         self.send.clicked.connect(self.send_message)
+        self.input.submitted.connect(self.send_message)
         self.layout.addWidget(self.send)
         self.status = QLabel("Ready")
         self.layout.addWidget(self.status)

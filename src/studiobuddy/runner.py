@@ -36,6 +36,7 @@ class Runner(QObject):
     def close(self):
         if self.loop.is_closed():
             return
+
         async def shutdown():
             tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
             for task in tasks:
