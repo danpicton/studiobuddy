@@ -6,8 +6,13 @@ Use a disposable musical session. No project edits should occur.
    scale, app_id with `swaymsg -t get_tree`, focus/scratchpad bindings and no always-on-top.
 2. Existing PushTalk: focus input, hold/release existing F9, verify dictation and edit
    before sending. Verify its services/config/bindings are unchanged; no second mic.
-3. OpenAI: with your own API billing/key, send one message, verify answer and token
-   count. Try wrong key / exhausted quota only in an isolated launch, confirm safe error.
+3. ChatGPT: run the normal app, Continue with ChatGPT, approve plan usage, select
+   a discovered model and send one message. Verify account label, reply and token
+   count, restart persistence, refresh after token expiry, Cancel sign-in and Sign out.
+   Verify the default browser returns to the loopback callback on Arch/Sway. Check
+   Manage usage; confirm plan-limit failures never switch to API billing. Actual
+   account eligibility and inference remain unverified until this check succeeds.
+   Optional API mode: explicitly select api with your own API key/billing and test.
 4. Piper: install a licensed model + JSON, select it, Test Voice; verify normal audio
    output. While generating/playing press Stop, send another message and switch to Text.
    Old speech must never begin/resume. Remove model temporarily and verify text survives.

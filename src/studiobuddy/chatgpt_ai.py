@@ -38,7 +38,8 @@ class ChatGPTBackend(OpenAIBackend):
                 ) as client:
                     stream = await client.responses.create(
                         model=self.model,
-                        instructions=SYSTEM_PROMPT,
+                        instructions=SYSTEM_PROMPT
+                        + f"\nAim for at most {self.max_output_tokens} output tokens.",
                         input=[
                             {
                                 "role": "user",
@@ -50,7 +51,6 @@ class ChatGPTBackend(OpenAIBackend):
                             {"role": m["role"], "content": m["content"][:4000]}
                             for m in messages[-20:]
                         ],
-                        max_output_tokens=self.max_output_tokens,
                         store=False,
                         stream=True,
                     )

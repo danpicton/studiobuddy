@@ -40,20 +40,25 @@ for automated tests. See [development evidence](docs/development-log.md).
 
 ## First conversation
 
-Set `OPENAI_API_KEY` securely in the launch environment, then run `studio-buddy`.
-Do not commit keys, paste them into chat, or put them in `config.toml`.
-For a terminal launch without putting a value in shell history:
+Run `uv run studio-buddy` from the checkout (or `studio-buddy` after tool installation).
+ChatGPT subscription mode is the default, including when loading an older config.
 
-```sh
-read -rs -p 'OpenAI API key: ' OPENAI_API_KEY; echo
-export OPENAI_API_KEY
-studio-buddy
-```
+Click **Continue with ChatGPT**, finish sign-in in your system browser, and approve
+ChatGPT plan usage for Studio Buddy. Return to the app and choose an available model.
+**Refresh models** reloads your account's catalogue; **Manage usage** opens ChatGPT's
+usage settings. Your account must be eligible for this preview and grant plan usage.
+The app does not use your Codex login or require an API key for subscription replies.
+See [OpenAI's local-app integration guide](https://developers.openai.com/cookbook/articles/sign-in-with-chatgpt).
 
-A desktop launcher must inherit the variable from your session or your own secure
-credential launcher. Settings shows only whether a key is present, never its value.
-A ChatGPT subscription does **not** include API billing. Configure an OpenAI API
-account and billing separately. Default model: `gpt-4.1-mini`, changeable in Settings.
+**Sign out** revokes the renewable session and clears local tokens. If revocation
+cannot be confirmed, the app tells you to disconnect it in ChatGPT Settings → Usage.
+This personal desktop implementation keeps one account registration; reauthorization
+uses that same account. It does not offer multiple-account switching.
+
+For explicitly separate API billing, select **Ai mode: api** in Settings and set
+`OPENAI_API_KEY` securely in the launch environment. The **API model** field applies
+only to that mode. ChatGPT mode never falls back to API billing. Cloud speech providers
+remain separate paid services; Piper runs locally.
 
 Type or paste into the message field and click Send or press **Ctrl+Enter**.
 Enter alone adds a newline. Replies stay short and suggest one experiment; the user
@@ -70,10 +75,12 @@ and bounded context are sent. Selected Renoise observations reserve space within
 12,000-character context budget before stored memories are trimmed. Old chat is not
 automatically promoted into memory.
 
-Default safeguards: 100 requests per session, 300 output tokens per request;
-editable in Settings. Request attempts persist across restart and count failures and
-cancellations. The SDK can retry once, so these are **not exact financial caps**.
-Set provider-side billing budgets as well. Cancellation cannot reverse API charges.
+Default safeguards: 100 requests per session and a 300-token response length setting,
+editable in Settings. ChatGPT mode uses that length as a prompt target because its
+preview API does not support an enforced output-token limit. API mode sends the limit. Request attempts persist across restart and count failures and
+cancellations. API mode can retry once; ChatGPT mode does not automatically retry inference. These
+are **not exact spending caps**. Review ChatGPT app usage/credit limits under Manage
+usage, or API billing budgets for API mode. Cancellation cannot reverse consumed usage.
 Token usage is shown after a reply. Missing keys, auth failures, quotas and network
 errors leave history intact and display a safe message; send again when resolved.
 
@@ -175,7 +182,9 @@ for the specific Renoise server remains the principal integration gap.
 - Settings: `$XDG_CONFIG_HOME/studio-buddy/config.toml` (default `~/.config/...`).
 - Database: `$XDG_DATA_HOME/studio-buddy/memory.sqlite` (default `~/.local/share/...`).
 - Audio: private temporary directories, deleted after playback/cancellation.
-- Credentials: process environment only; not stored in settings, DB or logs.
+- ChatGPT credentials: `$XDG_CONFIG_HOME/studio-buddy/chatgpt-auth.json`, atomically
+  written with mode 0600. Contains OAuth tokens; never share or commit this file.
+- API/voice keys: process environment only. No credentials enter settings, DB or logs.
 
 Settings and database files are mode 0600. Data is local, not encrypted; protect your
 user account and disk. Chat and selected context go to OpenAI (`store=false`); cloud
@@ -194,7 +203,8 @@ uv build
 ```
 
 Tests use native Qt widgets, isolated databases, fake providers and HTTP transports;
-no paid credentials, mic, Renoise or audio hardware required. CI runs Python 3.11 and
+no real credentials, mic, Renoise or audio hardware required. OAuth tests use a
+loopback callback and generated test signing keys; remote endpoints are mocked. CI runs Python 3.11 and
 3.12. Tests verify actual widget conversations, persistence, cancellation/stale results,
 request payloads/errors, notes/settings and MCP resource restrictions. See
 [local verification checklist](docs/local-verification.md) for checks that cannot be
@@ -202,7 +212,9 @@ claimed from mocks, and [API references](docs/integrations.md) for sources.
 
 ## Troubleshooting
 
-- No reply: check key presence, model access, network, API credits and request limit.
+- No reply: in ChatGPT mode, sign in, choose a listed model and check Manage usage.
+  In API mode, check key presence and billing. Both modes need network/model access
+  and remaining session requests.
 - No speech: check Text/Voice, selected voice/model, ffplay/Piper PATH and audio output.
   Cloud auth/quota errors appear without remote response bodies or keys.
 - Qt cannot load Wayland: verify Arch prerequisites and run in the actual Sway session;

@@ -1,3 +1,5 @@
+ai_mode = "chatgpt"
+chatgpt_model = ""
 model = "gpt-4.1-mini"
 request_limit = 100
 max_output_tokens = 300

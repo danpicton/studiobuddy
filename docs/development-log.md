@@ -141,3 +141,20 @@ GREEN: 6 inference tests passed with fake SSE streams: OAuth-only requests, expl
 terminal completion, failures after partial output, cancellation and no API fallback.
 REFACTOR: dedicated subscription adapter preserves the existing request-limit
 interface. Regression: 51 passed, 1 optional MCP test skipped; Ruff passed.
+
+## Subscription slice 3 — Desktop account controls and model selection
+RED: two UI tests fail because Window has no account/sign-in integration.
+Additional RED: the request-contract test fails when it rejects max_output_tokens,
+which the official SIWC preview limitations explicitly mark unsupported. Subscription
+mode must use a prompt length target, not claim an enforced output-token cap.
+GREEN: desktop tests cover sign-in, discovered model selection, persistence, sign-out
+and stale login suppression. Subscription requests now omit unsupported output caps.
+Additional security regressions passed immediately: forged signatures, returning
+registration/identity checks and failed-revocation recovery. REFACTOR: account UI
+owns its worker loop and passes only display state to Qt; API mode stays explicit.
+Final regression: default installation 56 passed, 1 optional MCP test skipped;
+Renoise extra 57 passed. Ruff, package build and git diff --check passed.
+Offscreen UI visually inspected at 540x692. Startup/shutdown passed outside the
+restricted execution sandbox; the same smoke inside it timed out waiting on an
+asyncio worker. No real credentials, browser login or subscription inference used.
+The user must complete the documented browser/account/model live check on desktop.

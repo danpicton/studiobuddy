@@ -25,3 +25,23 @@ Cancellation closes the HTTP stream; file playback is a cancellable ffplay child
 All network workers run outside Qt's UI thread. OpenAI never receives a tools schema.
 No key values are written in errors, config or logs. MCP resource text stays in the
 user context channel and is explicitly marked untrusted, bounded and single-request.
+
+
+## ChatGPT plan integration (2026-11-07)
+
+Studio Buddy uses the official direct local-app flow, not Codex app-server or
+private ChatGPT endpoints:
+
+- https://developers.openai.com/siwc/token-sharing-open-source/sign-in
+- https://developers.openai.com/siwc/token-sharing-open-source/profiles-and-sessions
+- https://developers.openai.com/siwc/token-sharing-open-source/models-and-inference
+- https://developers.openai.com/siwc/token-sharing-open-source/preview-limitations
+
+OAuth uses PKCE/state/nonce and a temporary loopback listener. PyJWT/cryptography
+verifies identity signatures. Protected app-owned storage and a file lock support
+rotating refresh tokens. Responses use OAuth, explicit public API URLs, store=false,
+stream=true, no tools and no automatic API-key fallback. The model catalogue comes
+from the connected account. The subscription preview rejects max_output_tokens;
+the length setting is therefore only a prompt target in subscription mode.
+This personal app keeps one account registration. Account eligibility, browser
+round-trip and a real subscription reply require the user's live desktop check.

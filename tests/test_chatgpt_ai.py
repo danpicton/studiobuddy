@@ -25,6 +25,7 @@ async def test_subscription_request_uses_oauth_without_api_key_fallback(monkeypa
         payload = json.loads(request.content)
         assert payload["stream"] is True and payload["store"] is False
         assert "tools" not in payload
+        assert "max_output_tokens" not in payload
         assert payload["model"] == "account-model"
         assert payload["input"][-1]["content"] == "Keep the bass"
         return httpx.Response(

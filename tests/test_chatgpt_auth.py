@@ -40,7 +40,7 @@ def service():
         if request.url.path == "/jwks":
             return httpx.Response(200, json={"keys": [jwk]})
         if request.url.path == "/revoke":
-            return httpx.Response(200)
+            return httpx.Response(state.get("revocation_status", 200))
         if request.url.path == "/api/accounts/oauth/token":
             data = parse_qs(request.content.decode())
             assert data["client_id"] == ["oaiapp_test"]
@@ -72,7 +72,9 @@ def service():
                     "nonce": state["nonce"],
                     **state.get("claims_override", {}),
                 },
-                key,
+                rsa.generate_private_key(public_exponent=65537, key_size=2048)
+                if state.get("bad_signature")
+                else key,
                 algorithm="RS256",
                 headers={"kid": "test"},
             )
@@ -102,7 +104,9 @@ def service():
 
     async def browser(url):
         params = parse_qs(urlsplit(url).query)
-        assert params["client_id"] == ["dynamic_agent_client"]
+        assert params["client_id"] == [
+            "oaiapp_test" if state.get("returning") else "dynamic_agent_client"
+        ]
         assert params["code_challenge_method"] == ["S256"]
         state["nonce"] = params["nonce"][0]
         state["challenge"] = params["code_challenge"][0]
@@ -215,3 +219,37 @@ async def test_cancelled_login_closes_callback_listener(tmp_path):
         with pytest.raises(httpx.ConnectError):
             await client.get(callback)
     assert auth.account_label() == ""
+
+
+async def test_forged_signature_is_rejected(tmp_path, service):
+    state, transport, browser = service
+    state["bad_signature"] = True
+    auth = ChatGPTAuth(tmp_path / "auth.json", transport=transport)
+    with pytest.raises(AuthError):
+        await auth.sign_in(browser)
+    assert "access-secret" not in auth.path.read_text()
+
+
+async def test_returning_login_reuses_registration_and_rejects_other_identity(tmp_path, service):
+    state, transport, browser = service
+    auth = ChatGPTAuth(tmp_path / "auth.json", transport=transport)
+    await auth.sign_in(browser)
+    state["returning"] = True
+    await auth.sign_in(browser)
+    before = auth.path.read_text()
+    state["claims_override"] = {"sub": "another-person"}
+    with pytest.raises(AuthError, match="same ChatGPT account"):
+        await auth.sign_in(browser)
+    assert auth.path.read_text() == before
+
+
+async def test_failed_revocation_clears_local_tokens_and_explains_recovery(tmp_path, service):
+    state, transport, browser = service
+    auth = ChatGPTAuth(tmp_path / "auth.json", transport=transport)
+    await auth.sign_in(browser)
+    state["revocation_status"] = 503
+    with pytest.raises(AuthError, match="remote revocation was not confirmed"):
+        await auth.sign_out()
+    assert auth.account_label() == ""
+    assert "access-secret" not in auth.path.read_text()
+    assert len([r for r in state["requests"] if r.url.path == "/revoke"]) == 2
