@@ -34,3 +34,11 @@ The dedicated instance uses small.en/CPU/int8, four threads, no pre-roll; model
 download cache is shared, model RAM and mic streams are separate. No paid STT.
 Studio Buddy's private local socket uses bounded newline JSON and a lock file;
 no TCP listener, focus injection, model tools or automatic memory writes.
+
+Voice CLI processes coordinate through `voice-control.lock` in the private runtime
+directory. Its per-start token is invalidated by release/cancel. GUI preparation
+runs without holding that lock, so a slow GUI cannot make a released key start
+capture later. The final token check and STT start are serialized with stop/cancel;
+an already-issued daemon start completes before release/cancel is sent. Cancellation
+always attempts STT before contacting the GUI, and attempts GUI cancellation even
+if STT reports an error. Never remove the lock file while clients are running.

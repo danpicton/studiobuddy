@@ -1,13 +1,16 @@
 """Private transcript IPC; capture and Whisper stay in an unmodified PushTalk instance."""
 
 import argparse
+import fcntl
 import json
 import os
 import socket
 import stat
 import subprocess
 import sys
+from contextlib import contextmanager
 from pathlib import Path
+from uuid import uuid4
 
 from PySide6.QtCore import QLockFile, QObject, QTimer
 from PySide6.QtNetwork import QLocalServer
@@ -47,6 +50,63 @@ def request(action, text=None):
     result = json.loads(response)
     if not result.get("ok"):
         raise RuntimeError(result.get("error", "Studio Buddy rejected the command"))
+
+
+@contextmanager
+def control_lock(directory):
+    # Keep this inode: unlinking/replacing a lock file splits concurrent clients.
+    with (directory / "voice-control.lock").open("a+") as control:
+        fcntl.flock(control, fcntl.LOCK_EX)
+        try:
+            control.seek(0)
+            yield control
+        finally:
+            fcntl.flock(control, fcntl.LOCK_UN)
+
+
+def speech_command(directory, action):
+    result = subprocess.run(
+        ["sttctl", "--socket", str(directory / "sttd.sock"), action],
+        capture_output=True,
+        timeout=6,
+        check=False,
+    )
+    if action == "status":
+        if result.returncode or result.stdout.strip() != b"idle":
+            raise RuntimeError("Speech daemon busy or unavailable; wait for transcription")
+    elif result.returncode or result.stdout.strip().startswith(b"error"):
+        raise RuntimeError("Speech daemon unavailable or busy; check studio-buddy-stt.service")
+
+
+def control_speech(action):
+    directory = runtime_path()
+    token = uuid4().hex if action == "start" else ""
+    try:
+        with control_lock(directory) as control:
+            control.truncate(0)
+            control.write(token)
+            control.flush()
+            speech_command(directory, "status" if action == "start" else action)
+    finally:
+        if action == "cancel":
+            # Even failed/timed-out GUI IPC must not prevent microphone cancellation.
+            request("cancel")
+    if action != "start":
+        return
+
+    # GUI preparation must not hold the STT lock: release/cancel can invalidate
+    # this token while the GUI is unresponsive, without waiting for its reply.
+    request("start")
+    try:
+        with control_lock(directory) as control:
+            if control.read() != token:
+                return
+            # The token check and daemon start are one critical section. A release
+            # racing an already-issued start therefore sends stop/cancel after it.
+            speech_command(directory, "start")
+    except (OSError, RuntimeError, subprocess.SubprocessError):
+        request("cancel")
+        raise
 
 
 class VoiceServer(QObject):
@@ -167,27 +227,7 @@ def main():
                 raise RuntimeError("Transcript too long")
             request("submit", raw.decode("utf-8"))
         elif args.action in ("start", "stop", "cancel"):
-            command = ["sttctl", "--socket", str(runtime_path() / "sttd.sock")]
-            if args.action == "start":
-                status = subprocess.run(
-                    command + ["status"], capture_output=True, timeout=6, check=False
-                )
-                if status.returncode or status.stdout.strip() != b"idle":
-                    raise RuntimeError("Speech daemon busy or unavailable; wait for transcription")
-            if args.action != "stop":
-                request(args.action)
-            result = subprocess.run(
-                command + [args.action],
-                capture_output=True,
-                timeout=6,
-                check=False,
-            )
-            if result.returncode or result.stdout.strip().startswith(b"error"):
-                if args.action == "start":
-                    request("cancel")
-                raise RuntimeError(
-                    "Speech daemon unavailable or busy; check studio-buddy-stt.service"
-                )
+            control_speech(args.action)
         else:
             request(args.action)
     except (OSError, RuntimeError, ValueError, subprocess.SubprocessError) as error:

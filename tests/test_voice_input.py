@@ -63,7 +63,7 @@ def test_voice_socket_does_not_replace_live_server(qtbot, tmp_path):
     server.close()
 
 
-def test_client_does_not_start_when_daemon_transcribing(monkeypatch, capsys):
+def test_client_does_not_start_when_daemon_transcribing(monkeypatch, capsys, tmp_path):
     from types import SimpleNamespace
     from unittest.mock import Mock
 
@@ -73,7 +73,7 @@ def test_client_does_not_start_when_daemon_transcribing(monkeypatch, capsys):
     request = Mock()
     monkeypatch.setattr(voice_input.subprocess, "run", run)
     monkeypatch.setattr(voice_input, "request", request)
-    monkeypatch.setattr(voice_input, "runtime_path", lambda: __import__("pathlib").Path("/tmp"))
+    monkeypatch.setattr(voice_input, "runtime_path", lambda: tmp_path)
     monkeypatch.setattr("sys.argv", ["studio-buddy-voice", "start"])
     assert voice_input.main() == 1
     request.assert_not_called()

@@ -124,3 +124,35 @@ uv build produced wheel and sdist. Live Arch/Sway F10/F9 coexistence, PipeWire m
 CPU contention during music, notification display, actual speech and paid model
 reasoning remain explicitly unverified. Service files are supplied, not installed
 or started. PushTalk checkout used for inspection only; upstream is unmodified.
+
+## 14 — Serialize voice controls and cancel independently of the GUI
+RED: `UV_CACHE_DIR=/workspace/work/uv-cache QT_QPA_PLATFORM=offscreen uv run
+pytest tests/test_voice_control.py -q` produced 4 failed / 2 passed. Separate spawned
+CLI processes reproduced stop and cancel completing during blocked GUI preparation,
+then the stale start turning fake capture on. GUI unavailable/timeout tests reproduced
+cancel skipping STT entirely. The two start-GUI-failure guards passed unchanged.
+
+GREEN: original regressions and existing voice tests passed (15 tests). The private
+runtime lock file now holds a per-start token. All STT status/start/stop/cancel
+commands share its OS file lock across CLI processes. GUI preparation happens
+outside the lock: stop/cancel clear the token without waiting for the GUI, and a
+stale start exits successfully without starting capture. The final token check and
+STT start share the lock, ordering a racing stop/cancel after any already-issued
+start. Cancellation attempts STT first and GUI second, including daemon errors.
+
+REFACTOR: formatted the changed Python files and isolated the existing busy-daemon
+test's runtime directory. STT command/error handling and lock lifetime use shared
+helpers. Expanded regression tests passed immediately (not extra RED
+claims): cancel with unavailable/timed-out GUI still invalidates another process's
+pending start; stop/cancel serialize behind an in-flight daemon start; failed or
+timed-out STT cancellation still attempts GUI cancellation. Services are fakes;
+CLI processes, file locking, token storage and synchronization are real.
+
+Regression: `UV_CACHE_DIR=/workspace/work/uv-cache QT_QPA_PLATFORM=offscreen uv run
+pytest` passed all 59 tests; `UV_CACHE_DIR=/workspace/work/uv-cache uv run ruff check`
+and `git diff --check` passed. Reviewed the complete change. PushTalk code,
+configuration, services and F9 bindings remain untouched. No microphone capture or
+paid API calls were made. Actual Arch/Sway key delivery, PipeWire capture, daemon
+failure recovery and real desktop notification/speech behavior remain manual
+hardware checks. A control already inside STT IPC can delay release/cancel until
+that bounded subprocess returns (six-second timeout); GUI waiting holds no lock.
