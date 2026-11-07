@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .ai import AIError, MockAI, OpenAIBackend
+from .ai import AIError, MockAI, OpenAIBackend, compose_context
 from .memory_ui import NotesDialog
 from .renoise import ContextError, Renoise
 from .runner import Runner
@@ -400,7 +400,9 @@ class Window(QMainWindow):
             self.token,
             self.ai.reply(
                 list(self.messages),
-                self.store.context(self.project_id, self.session_id) + "\n" + self.renoise_context,
+                compose_context(
+                    self.store.context(self.project_id, self.session_id), self.renoise_context
+                ),
             ),
         )
         if self.renoise_context:

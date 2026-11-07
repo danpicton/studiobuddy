@@ -112,3 +112,14 @@ Renoise extra installed: 36 passed. Ruff initially caught a missing explicit
 subprocess check argument in the new test; fixed and rerun successfully. REFACTOR:
 lazy SDK imports stay inside the adapter; safe adapter errors reach the UI.
 CI now covers both installation modes. Live Renoise compatibility remains untested.
+
+## Review fix 3 — Preserve selected observations under a full memory budget
+RED: the new desktop-to-OpenAI-payload test failed as expected: an approximately
+8,000-character snapshot disappeared when explicit memories filled the context.
+The test also checks the total bound and that the next request omits the snapshot.
+GREEN: actual request retains the complete selected snapshot plus memory content,
+within 12,000 characters, and excludes the snapshot on the next request. REFACTOR:
+centralized the AI context limit and composition helper. Regression with Renoise:
+37 passed; default installation: 36 passed, 1 optional transport test skipped.
+`uv run ruff check`, `git diff --check` and `uv build` passed. Paid services,
+actual audio, Arch/Sway and live Renoise remain manual checks; none were run.

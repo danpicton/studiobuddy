@@ -66,7 +66,9 @@ experiments, rejections, outcomes, decisions and ideas to revisit. **Wrap up** s
 a short manually edited summary and next step. No paid automatic summary request.
 Recent conversation, explicit notes and previous summaries accompany future replies.
 All messages remain in SQLite; only the latest 20 messages (4,000 characters each)
-and bounded context are sent. Old chat is not automatically promoted into memory.
+and bounded context are sent. Selected Renoise observations reserve space within the
+12,000-character context budget before stored memories are trimmed. Old chat is not
+automatically promoted into memory.
 
 Default safeguards: 100 requests per session, 300 output tokens per request;
 editable in Settings. Request attempts persist across restart and count failures and
