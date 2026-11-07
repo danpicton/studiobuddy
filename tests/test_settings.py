@@ -43,3 +43,18 @@ async def test_fallback_only_local():
     speech.voice = True
     await speech.say("hello")
     assert player.played == [b"wav"]
+
+
+def test_reasoning_setting_roundtrip_and_widget(qtbot, tmp_path):
+    from studiobuddy.settings_ui import SettingsDialog
+
+    path = tmp_path / "config.toml"
+    settings = Settings(model="o3", reasoning_effort="high")
+    settings.save(path)
+    assert Settings.load(path).reasoning_effort == "high"
+    dialog = SettingsDialog(settings, path, lambda s: None, lambda: None)
+    qtbot.addWidget(dialog)
+    dialog.fields["reasoning_effort"].setCurrentText("low")
+    assert dialog.values().reasoning_effort == "low"
+    with pytest.raises(ValueError):
+        Settings(reasoning_effort="invalid").validate()

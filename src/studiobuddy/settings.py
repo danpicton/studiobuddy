@@ -18,6 +18,7 @@ def config_path():
 @dataclass
 class Settings:
     model: str = "gpt-4.1-mini"
+    reasoning_effort: str = "default"
     request_limit: int = 100
     max_output_tokens: int = 300
     voice_mode: bool = False
@@ -54,6 +55,16 @@ class Settings:
             raise ValueError("Request limit must be 1–10000; output limit 50–2000 tokens")
         if not 0 <= self.eleven_stability <= 1 or not 0.75 <= self.hume_speed <= 1.5:
             raise ValueError("Voice settings out of range")
+        if self.reasoning_effort not in (
+            "default",
+            "none",
+            "minimal",
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+        ):
+            raise ValueError("Invalid reasoning effort")
         if not self.model.strip():
             raise ValueError("Choose an OpenAI model")
         if self.mcp_enabled:

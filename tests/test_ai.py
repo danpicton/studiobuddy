@@ -68,3 +68,19 @@ async def test_real_sdk_error_mapping(code, message, monkeypatch):
         with pytest.raises(AIError, match=message) as error:
             await OpenAIBackend(client=client).reply([])
         assert "secret remote body" not in str(error.value)
+
+
+@pytest.mark.parametrize("effort", ["default", "low", "medium", "high"])
+async def test_reasoning_payload(effort):
+    create = AsyncMock(return_value=SimpleNamespace(output_text="Try drums", usage=None))
+    ai = OpenAIBackend(
+        model="o3",
+        reasoning_effort=effort,
+        client=SimpleNamespace(responses=SimpleNamespace(create=create)),
+    )
+    await ai.reply([])
+    payload = create.call_args.kwargs
+    if effort == "default":
+        assert "reasoning" not in payload
+    else:
+        assert payload["reasoning"] == {"effort": effort}

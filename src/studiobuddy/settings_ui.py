@@ -46,6 +46,7 @@ class SettingsDialog(QDialog):
         form = QFormLayout(body)
         self.fields = {}
         choices = {
+            "reasoning_effort": ["default", "none", "minimal", "low", "medium", "high", "xhigh"],
             "provider": ["piper", "elevenlabs", "hume"],
             "fallback": ["text", "piper"],
             "theme": ["dark", "system"],

@@ -17,8 +17,16 @@ class AIError(Exception):
 
 
 class OpenAIBackend:
-    def __init__(self, model="gpt-4.1-mini", request_limit=100, max_output_tokens=300, client=None):
+    def __init__(
+        self,
+        model="gpt-4.1-mini",
+        request_limit=100,
+        max_output_tokens=300,
+        client=None,
+        reasoning_effort="default",
+    ):
         self.model = model
+        self.reasoning_effort = reasoning_effort
         self.request_limit = request_limit
         self.max_output_tokens = max_output_tokens
         self.requests = 0
@@ -47,6 +55,11 @@ class OpenAIBackend:
                 + [{"role": m["role"], "content": m["content"][:4000]} for m in messages[-20:]],
                 max_output_tokens=self.max_output_tokens,
                 store=False,
+                **(
+                    {"reasoning": {"effort": self.reasoning_effort}}
+                    if self.reasoning_effort != "default"
+                    else {}
+                ),
             )
             if not response.output_text:
                 raise AIError("The model returned no text. Try again or choose another model.")

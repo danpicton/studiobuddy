@@ -94,3 +94,11 @@ feat/studio-buddy-mvp was successfully pushed using existing platform Git access
 Environment status still reports revision 1 with no custom domains applied; the
 saved network draft has not changed runtime access. GitHub API access remains blocked.
 Reusable uv install/start instructions were saved in the environment draft.
+
+## 12 — Model reasoning effort
+RED: targeted suite 5 failed / 8 passed: backend/settings rejected reasoning_effort.
+Initial uv invocation was blocked by read-only default cache; subsequent commands
+use UV_CACHE_DIR=/workspace/work/uv-cache. Added persisted model-specific effort,
+Settings selector, runtime application and optional Responses reasoning payload.
+GREEN / REFACTOR / regression: ruff format; 38 tests passed; ruff check passed.
+Paid model compatibility is a manual check; default omits reasoning for existing models.

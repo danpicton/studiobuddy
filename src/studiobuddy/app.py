@@ -198,6 +198,7 @@ class Window(QMainWindow):
         self.settings = settings
         if isinstance(self.ai, OpenAIBackend):
             self.ai.model = settings.model
+            self.ai.reasoning_effort = settings.reasoning_effort
             self.ai.request_limit = settings.request_limit
             self.ai.max_output_tokens = settings.max_output_tokens
         self.renoise = Renoise(settings.mcp_url) if settings.mcp_enabled else None
