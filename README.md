@@ -177,7 +177,7 @@ Piper voice (or chosen cloud voice), and use Test Voice. Then close the regular 
 and install the supplied units:
 
 ```sh
-uv tool install --reinstall ".[speech]"
+uv tool install --reinstall ".[speech,renoise]"
 mkdir -p ~/.config/systemd/user
 cp packaging/studio-buddy*.service ~/.config/systemd/user/
 systemctl --user daemon-reload
@@ -239,6 +239,9 @@ Do not change projects while dictating; select the intended project first in the
 `studio-buddy --background` starts hidden and enables speech for that launch using
 the saved provider. Normal launch shows the UI; launching again shows the existing
 instance. Closing the background window hides it and keeps the companion running.
+A tray icon opens the window on click; its menu offers Show, Hide and Quit.
+On Sway, enable the `tray` module in Waybar (or another StatusNotifier host).
+Without a tray host, the show binding and CLI remain available.
 `studio-buddy-voice show` / `hide` control the window; `cancel` interrupts both capture
 and the response. Desktop notifications show response/error status (requires
 `notify-send` and a notification daemon). Conversation text/errors remain in the UI.

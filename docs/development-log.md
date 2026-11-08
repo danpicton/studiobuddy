@@ -386,3 +386,30 @@ access outside the sandbox. No live Renoise reads, paid API calls, microphone or
 hardware checks were performed. Manual Arch/Sway check: restart the checkout app
 with speech and renoise extras, Connect, select an observation, Read once and send
 a chat message. PushTalk was untouched.
+
+## Background tray controls
+RED (2026-11-08): `QT_QPA_PLATFORM=offscreen uv run pytest tests/test_tray.py -q`
+failed as expected because studiobuddy.tray does not exist. Test describes closing
+to background, reopening via tray click/menu, hiding, and requesting quit.
+The run required authorized access to uv's cache. No live desktop or mic used.
+GREEN: tray test passes. REFACTOR: tray controls live in a separate desktop module;
+background app owns the tray lifecycle and retains existing worker cleanup.
+Regression: `QT_QPA_PLATFORM=offscreen uv run pytest` passed 141 tests;
+`uv run ruff check` and `git diff --check` passed. User tool installed with speech
+and renoise extras; all three reviewed user units installed. Only the background
+app started: active, zero restarts, control socket hide command succeeds. Waybar
+already has a tray host. No Sway config edits or PushTalk/F9 changes. Speech and
+listener services remain inactive; no microphone, paid calls or audio tests run.
+Manual Arch/Sway checks remain: tray click/menu, F10 capture and cancellation,
+API/voice credential availability in systemd, and session startup after the user
+merges the prepared Sway bindings. Local handoff updated with current state.
+Additional RED before commit: user reports no visible tray icon. D-Bus confirms the
+app is Active with a populated IconPixmap, but pixel RGB values are near black.
+`QT_QPA_PLATFORM=offscreen uv run pytest tests/test_tray.py -q` gives 1 expected
+failure and 1 pass: dark-bar visibility test counts zero bright opaque pixels.
+Replace theme fallback with an explicit high-contrast native painted icon.
+GREEN after visibility fix: 142 tests pass and Ruff passes. The tray now paints a
+white headphone symbol on a bright purple disc at five sizes, independent of icon
+themes. Reinstalled and restarted only studio-buddy.service; active with zero
+restarts. User visual confirmation pending; commit intentionally held at user's
+request. No microphone capture or Sway config changes.

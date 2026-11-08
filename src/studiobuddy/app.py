@@ -550,9 +550,14 @@ def main():
         return 1
     window.background = "--background" in sys.argv
     app.setQuitOnLastWindowClosed(not window.background)
+    tray = None
     if window.background:
         from PySide6.QtCore import QProcess
 
+        from .tray import BackgroundTray
+
+        tray = BackgroundTray(window, app.quit)
+        tray.show()
         window.status.textChanged.connect(
             lambda text: QProcess.startDetached("notify-send", ["Studio Buddy", text])
         )
@@ -562,6 +567,8 @@ def main():
     try:
         app.exec()
     finally:
+        if tray:
+            tray.hide()
         server.close()
         window.background = False
         window.close()
