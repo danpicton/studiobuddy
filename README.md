@@ -250,7 +250,14 @@ On Sway, enable the `tray` module in Waybar (or another StatusNotifier host).
 Without a tray host, the show binding and CLI remain available.
 `studio-buddy-voice show` / `hide` control the window; `cancel` interrupts both capture
 and the response. Desktop notifications show response/error status (requires
-`notify-send` and a notification daemon). Conversation text/errors remain in the UI.
+`notify-send` and a notification daemon). One notification updates in place using
+the daemon's returned ID. Rapid updates queue in order, each for at least one
+second after delivery; consecutive duplicates are skipped. Updates request a
+1.8-second expiry, so the final status disappears automatically when the daemon
+honours the timeout. Mako can override this with a Studio Buddy-specific rule.
+Display timing does not delay capture, inference or playback. If notify-send fails
+or returns an invalid ID, popups stop for that app launch to avoid stacking;
+status and conversation text remain available in the UI.
 To stop the background services:
 
 ```sh

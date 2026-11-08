@@ -436,3 +436,25 @@ or live transcription tests run. Manual Arch/Sway checks: user starts the speech
 backend, clicks once to record and again to send, verifies spoken reply, colour,
 cancel and show/hide. Sway listener remains optional for tray capture. PushTalk/F9
 and Sway config unchanged.
+
+## Replace background status notifications in place
+RED (2026-11-08): `QT_QPA_PLATFORM=offscreen uv run pytest
+ tests/test_notifications.py -q` fails 3 tests as expected: the notification
+controller is missing. Tests require a shared notification ID, serialized sends,
+a minimum one-second display time, duplicate suppression, shutdown cleanup and
+safe failure when notify-send is unavailable. Fake processes only.
+GREEN: five focused notification tests pass, including actual QProcess stdout
+parsing against a fake notify-send executable and >=1 second dwell measurements.
+An initial combined mocked run hit a Qt teardown bus error; isolated test passed.
+The fixtures now retain an explicit QWidget parent through teardown; focused and
+full runs pass. REFACTOR: DesktopNotifications owns queued status display, precise
+dwell timer, daemon IDs, escaped markup, bounded IPC, duplicate suppression and
+shutdown cleanup. Failures disable popups for the launch rather than risk stacking.
+Regression: `QT_QPA_PLATFORM=offscreen uv run pytest` passed 154 tests;
+`uv run ruff check` and `git diff --check` passed. Live Mako preview with the real
+controller kept ID 115 for Listening/Thinking/Done, using queued one-second dwell
+and 1.8-second expiry. No microphone, audio, paid API or inference checks performed.
+The app and speech backend are active; listener inactive. Operator must run
+`systemctl --user restart studio-buddy.service` to activate the installed update:
+PartOf propagates that restart to the active microphone backend, which the agent
+must not start. Other Mako theme, Sway config, PushTalk and F9 remain unchanged.
