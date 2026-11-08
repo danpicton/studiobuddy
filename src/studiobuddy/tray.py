@@ -4,8 +4,10 @@ from PySide6.QtCore import QRectF, Qt
 from PySide6.QtGui import QColor, QIcon, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import QMenu, QSystemTrayIcon
 
+from .tray_voice import TrayVoice
 
-def buddy_icon():
+
+def buddy_icon(recording=False):
     """Paint headphones on a bright disc, independent of the desktop icon theme."""
     icon = QIcon()
     for size in (16, 22, 32, 48, 64):
@@ -15,7 +17,7 @@ def buddy_icon():
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         painter.scale(size / 32, size / 32)
         painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(QColor("#7263ef"))
+        painter.setBrush(QColor("#ef5269" if recording else "#7263ef"))
         painter.drawEllipse(QRectF(1, 1, 30, 30))
         painter.setPen(QPen(QColor("#ffffff"), 2.5))
         painter.setBrush(Qt.BrushStyle.NoBrush)
@@ -33,10 +35,13 @@ class BackgroundTray(QSystemTrayIcon):
     def __init__(self, window, quit_app):
         super().__init__(buddy_icon(), window)
         self.window = window
+        self.voice = TrayVoice(window)
+        self.voice.changed.connect(self.voice_changed)
         self.setToolTip("Studio Buddy")
         self.menu = QMenu(window)
         self.menu.addAction("Show Studio Buddy", self.show_window)
         self.menu.addAction("Hide window", window.hide)
+        self.menu.addAction("Cancel voice", self.voice.cancel)
         self.menu.addSeparator()
         self.menu.addAction("Quit Studio Buddy", quit_app)
         self.setContextMenu(self.menu)
@@ -48,5 +53,9 @@ class BackgroundTray(QSystemTrayIcon):
         self.window.activateWindow()
 
     def activate(self, reason):
-        if reason in (self.ActivationReason.Trigger, self.ActivationReason.DoubleClick):
-            self.show_window()
+        if reason == self.ActivationReason.Trigger:
+            self.voice.toggle()
+
+    def voice_changed(self, recording, message):
+        self.setIcon(buddy_icon(recording))
+        self.setToolTip("Studio Buddy · " + message)

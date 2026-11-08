@@ -413,3 +413,26 @@ white headphone symbol on a bright purple disc at five sizes, independent of ico
 themes. Reinstalled and restarted only studio-buddy.service; active with zero
 restarts. User visual confirmation pending; commit intentionally held at user's
 request. No microphone capture or Sway config changes.
+
+## Tray voice toggle
+RED: `QT_QPA_PLATFORM=offscreen uv run pytest tests/test_tray.py
+ tests/test_tray_voice.py -q` gives 4 expected failures and 2 passes: missing tray
+voice controller and left-click behavior. Tests use fake processes and private
+temporary state, never microphone capture. Existing tray setup committed as
+cf5fa6b after the user's visual verification.
+Additional RED: real QProcess → GUI → fake capture socket test fails because
+`python -m studiobuddy.voice_input` has no module entry point and exits without
+sending a start. Add the module guard so tray invocations run the existing CLI.
+GREEN: 24 focused tray/voice/order tests pass, including a real QProcess reaching
+the GUI and a fake capture socket for start/stop/cancel. CLI tokens preserve causal
+registration and cancellation cannot revoke a newer generation. REFACTOR: separate
+TrayVoice controller keeps IPC in QProcess children, uses nonblocking durable
+intent transactions, rejects stale completions and bounds control workers to 12s.
+Left click toggles recording/send; right-click menu keeps Show/Hide/Cancel/Quit.
+Shutdown kills pending controls and sends generation-scoped detached cancellation.
+Full regression: `QT_QPA_PLATFORM=offscreen uv run pytest` passed 149 tests;
+`uv run ruff check` and `git diff --check` passed. No microphone, audio, paid API
+or live transcription tests run. Manual Arch/Sway checks: user starts the speech
+backend, clicks once to record and again to send, verifies spoken reply, colour,
+cancel and show/hide. Sway listener remains optional for tray capture. PushTalk/F9
+and Sway config unchanged.

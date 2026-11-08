@@ -398,7 +398,11 @@ def main():
         elif args.action == "listen-sway":
             listen_sway()
         elif args.action in ("start", "stop", "cancel"):
-            control_speech(args.action)
+            if args.action == "cancel" and args.token:
+                with voice_state(runtime_path()) as state:
+                    if state.get("generation") == args.token:
+                        state["intent"] = state["recording"] = None
+            control_speech(args.action, args.token)
         else:
             request(args.action)
     except KeyboardInterrupt:
@@ -409,3 +413,7 @@ def main():
         print(f"Studio Buddy: {message}", file=sys.stderr)
         return 1
     return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

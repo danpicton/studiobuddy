@@ -19,7 +19,7 @@ def test_background_tray_reopens_hidden_window_and_offers_quit(qtbot):
     window.close()
     assert not window.isVisible()
     assert not window.closed
-    tray.activated.emit(QSystemTrayIcon.ActivationReason.Trigger)
+    tray.contextMenu().actions()[0].trigger()
     assert window.isVisible()
     tray.contextMenu().actions()[1].trigger()
     assert not window.isVisible()
@@ -46,4 +46,20 @@ def test_tray_icon_is_visible_on_a_dark_bar(qtbot):
         for pixel in [image.pixelColor(x, y)]
     )
     assert bright >= image.width() * image.height() // 4
+    window.close()
+
+
+def test_left_click_triggers_voice_without_showing_window(qtbot):
+    from studiobuddy.tray import BackgroundTray
+
+    window = Window()
+    qtbot.addWidget(window)
+    tray = BackgroundTray(window, Mock())
+    tray.voice.toggle = Mock()
+    tray.activated.emit(QSystemTrayIcon.ActivationReason.Trigger)
+    tray.voice.toggle.assert_called_once_with()
+    assert not window.isVisible()
+    tray.activated.emit(QSystemTrayIcon.ActivationReason.DoubleClick)
+    tray.voice.toggle.assert_called_once_with()
+    tray.voice.close()
     window.close()

@@ -239,7 +239,13 @@ Do not change projects while dictating; select the intended project first in the
 `studio-buddy --background` starts hidden and enables speech for that launch using
 the saved provider. Normal launch shows the UI; launching again shows the existing
 instance. Closing the background window hides it and keeps the companion running.
-A tray icon opens the window on click; its menu offers Show, Hide and Quit.
+Left-click the tray icon to start recording, then click again to send it for
+transcription and a spoken reply. The icon turns pink/red while starting/recording
+and returns to purple when stopped. Double-click is ignored to avoid an extra
+recording toggle. Right-click for Show Studio Buddy, Hide window, Cancel voice or
+Quit. Tray recording needs `studio-buddy-stt.service` running; it does not require
+the Sway binding listener. The app never starts the microphone service itself.
+If the backend is missing, the tooltip/notification tells you to check/start it.
 On Sway, enable the `tray` module in Waybar (or another StatusNotifier host).
 Without a tray host, the show binding and CLI remain available.
 `studio-buddy-voice show` / `hide` control the window; `cancel` interrupts both capture

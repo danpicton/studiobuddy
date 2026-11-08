@@ -569,6 +569,7 @@ def main():
     finally:
         if tray:
             tray.hide()
+            tray.voice.close()
         server.close()
         window.background = False
         window.close()
