@@ -41,15 +41,45 @@ def test_hidden_voice_conversation_preserves_draft(qtbot, tmp_path):
     qtbot.addWidget(window)
     server = VoiceServer(tmp_path / "voice.sock", window)
     window.input.setPlainText("unfinished draft")
+    statuses = []
+    window.status.textChanged.connect(statuses.append)
     assert exchange(qtbot, server.path, b'{"action":"start"}\n')["ok"]
     assert exchange(qtbot, server.path, b'{"action":"submit","text":"Help my bass"}\n')["ok"]
     qtbot.waitUntil(lambda: len(window.messages) == 2)
     assert window.messages[0]["content"] == "Help my bass"
     assert window.input.toPlainText() == "unfinished draft"
     assert not window.isVisible()
+    assert not any("interrupted" in status.lower() for status in statuses)
     assert exchange(qtbot, server.path, b'{"action":"show"}\n')["ok"]
     assert window.isVisible()
     server.close()
+
+
+def test_voice_start_cancels_previous_work_without_interrupted_status(qtbot, tmp_path):
+    from unittest.mock import Mock
+
+    from studiobuddy.voice_input import VoiceServer
+
+    window = Window()
+    qtbot.addWidget(window)
+    server = VoiceServer(tmp_path / "voice.sock", window)
+    pending = window.pending = Mock()
+    token = window.token
+    window.status.setText("Starting recording; click again to send")
+    statuses = []
+    window.status.textChanged.connect(statuses.append)
+    try:
+        assert exchange(qtbot, server.path, b'{"action":"start"}\n')["ok"]
+        pending.cancel.assert_called_once()
+        assert window.token > token
+        assert not any("interrupted" in status.lower() for status in statuses)
+        assert window.status.text() == "Starting recording; click again to send"
+        # An explicit interruption still reports itself and rejects this capture.
+        window.cancel()
+        assert "interrupted" in window.status.text().lower()
+        assert not exchange(qtbot, server.path, b'{"action":"submit","text":"old"}\n')["ok"]
+    finally:
+        server.close()
 
 
 def test_voice_rejects_stale_recording_and_bad_input(qtbot, tmp_path):

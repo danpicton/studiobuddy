@@ -478,3 +478,21 @@ Manual Arch/Sway check remains: reinstall the app tool with its existing extras,
 restart the app and use Test Voice with a licensed model/JSON to verify generation
 and normal audio output. No live audio, paid API or microphone checks performed;
 no services restarted.
+
+## Keep recording notifications free of internal interruption messages
+RED (2026-11-09): `QT_QPA_PLATFORM=offscreen uv run --locked pytest
+tests/test_voice_input.py -q` gives 1 expected failure and 8 passes. Starting a
+recording correctly cancels previous work and advances the stale-result token,
+but emits `Ready · interrupted` during that internal preparation. The regression
+observes status signals over real local IPC using mocked work, without capture.
+GREEN: 25 focused voice/tray/lifecycle tests passed. Routine voice preparation and
+message submission now call cancellation with `update_status=False`; cancellation
+still stops speech, cancels pending work and increments the stale-result token.
+Explicit cancellation retains its interrupted status. No notification filtering
+or queue changes were needed.
+Regression: `QT_QPA_PLATFORM=offscreen uv run pytest` passed 156 tests;
+`uv run ruff check` and `git diff --check` passed. Installed the update using
+`uv tool install --reinstall '.[speech,renoise]'`. No audio, microphone capture or
+paid APIs exercised. Manual Arch/Sway verification remains: operator restarts
+studio-buddy.service and confirms tray recording/send notifications. Service
+restart is left to the operator because PartOf restarts the active STT backend.

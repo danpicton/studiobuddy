@@ -427,7 +427,7 @@ class Window(QMainWindow):
         text = (self.input.toPlainText() if from_editor else text).strip()
         if not text:
             return
-        self.cancel()
+        self.cancel(update_status=False)
         self.store.message(self.session_id, "user", text)
         self.messages.append({"role": "user", "content": text})
         self.store.update_goal(self.session_id, self.goal.text())
@@ -457,12 +457,12 @@ class Window(QMainWindow):
             self.renoise_context = ""
             self.context_status.setText("Renoise · snapshot used; read again to refresh")
 
-    def cancel(self):
+    def cancel(self, *, update_status=True):
         if self.account:
             self.account.cancel()
         self.speech_runner.submit(0, self.speech.stop())
         self.token += 1
-        if hasattr(self, "status"):
+        if update_status and hasattr(self, "status"):
             self.status.setText("Ready · interrupted")
         if self.pending:
             self.pending.cancel()

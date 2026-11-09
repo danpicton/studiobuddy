@@ -340,7 +340,7 @@ class VoiceServer(QObject):
                 if action == "start":
                     if token != state.get("intent"):
                         raise RuntimeError("Recording was interrupted; hold F10 to try again")
-                    window.cancel()
+                    window.cancel(update_status=False)
                     self.recording = (token, window.session_id, window.token)
                 else:
                     text = payload.get("text")
