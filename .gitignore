@@ -8,3 +8,4 @@ dist/
 *.sqlite*
 chatgpt-auth.json*
 .chatgpt-*
+piper_voices/

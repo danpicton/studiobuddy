@@ -522,3 +522,14 @@ paid API or desktop notification checks performed. Manual Arch/Sway check remain
 operator restarts studio-buddy.service, verifies the reduced settings UI and
 saved Voice replies selection, and tests their selected provider. No services
 restarted by the agent because app restart propagates to the active STT backend.
+
+## Prepare branch for pull request
+RED (2026-11-09): `git check-ignore` for both downloaded files under piper_voices/
+returned exit 1, confirming the voice model/config appeared as untracked source.
+Added the local voice directory to .gitignore; downloads remain on disk. Updated
+docs/pull-request.md to describe the final branch, current validation and manual
+integration limits rather than the early 33-test MVP.
+GREEN: `git check-ignore` now lists both voice files. Regression:
+`QT_QPA_PLATFORM=offscreen uv run pytest` passed 161 tests;
+`uv run ruff check` and `git diff --check` passed. No runtime code changed,
+services restarted, microphone capture or paid API calls performed.

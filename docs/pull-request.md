@@ -1,23 +1,29 @@
-# Add Studio Buddy native music companion MVP
+# Add Studio Buddy desktop companion with voice and read-only Renoise context
 
-Builds a Python/PySide6 companion from the initial README-only repository. Users can
-chat with OpenAI Responses, resume SQLite projects/sessions, edit explicit musical
-memories and goals, and use coaching actions. Text/voice switching supports Piper,
-and ElevenLabs with cancellable generation/playback and stale-result protection.
-Includes TOML settings, request safeguards, native dictation-compatible input,
-optional read-only MCP resources, packaging, Arch/Sway documentation and CI.
+Adds a native PySide6 music companion with project/session history, editable
+memories and creative goals in SQLite. Supports ChatGPT subscription sign-in
+and explicitly selected OpenAI API billing, with request limits and protected
+local credential storage.
 
-Validation: 33 pytest tests pass on Python 3.12 using real offscreen Qt widgets,
-isolated SQLite, mocked cloud APIs and a real child-process cancellation check.
-Ruff passes; sdist/wheel build succeeds. Rendered 540×680 desktop smoke inspected.
-Per-slice RED/GREEN evidence and commits are recorded in docs/development-log.md.
-Remote CI has not been observed.
+- Background tray recording and optional F10 controls use a dedicated, token-aware
+  speech backend. Cancellation rejects stale transcripts/replies across sessions.
+  PushTalk and F9 remain independent.
+- Piper installs with the app; ElevenLabs is the supported cloud voice provider.
+  Hume support is removed with migration of old configurations. Background startup
+  respects the saved Text/Voice mode. Status notifications replace one popup and
+  routine recording preparation no longer reports a false interruption.
+- Optional local MCP context supports advertised resources or five fixed read-only
+  ReMCP observations. Connect discovers entries; Read once attaches a bounded
+  snapshot to the next message. The model receives no arbitrary or write tools.
 
-Limitations requiring review: the specified Renoise MCP tool page was blocked by
-environment egress policy. The integration supports official Streamable HTTP MCP
-resources only; specific ReMCP compatibility, tool-only/SSE/stdio support and song
-metadata capabilities are not verified. It never invokes write or Lua tools.
-Arch/Sway, PushTalk F9, hardware playback and live paid providers require the smoke
-checks in docs/local-verification.md. Cloud voices use configured IDs, buffered
-playback, and explicit local/text fallback. Summaries are manually saved; request
-limits are not monetary caps. PushTalk source/configuration/services are untouched.
+Includes Arch/Sway installation and service examples, an offscreen CI matrix,
+manual verification instructions and per-slice development evidence. Downloaded
+local Piper voices are ignored rather than distributed with the source.
+
+Validation: `QT_QPA_PLATFORM=offscreen uv run pytest` passed 161 tests;
+`uv run ruff check` and `git diff --check` passed. Tests use mocked cloud and
+capture services, real offscreen Qt widgets and bounded local IPC/process checks.
+
+Manual checks remain for live ReMCP Connect → Read once → chat, account/provider
+access, paid API calls, hardware audio and Arch/Sway session behavior. Mocked
+coverage does not establish those integrations; see docs/local-verification.md.
