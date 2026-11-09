@@ -2,6 +2,7 @@
 
 import asyncio
 import shutil
+import sys
 import tempfile
 from pathlib import Path
 from typing import Protocol
@@ -36,7 +37,7 @@ async def process(*args, input=None):
 
 
 class Piper:
-    def __init__(self, model="", executable="piper"):
+    def __init__(self, model="", executable=None):
         self.model, self.executable = model, executable
 
     @staticmethod
@@ -51,7 +52,8 @@ class Piper:
             )
         with tempfile.TemporaryDirectory(prefix="studio-buddy-") as directory:
             output = Path(directory) / "speech.wav"
-            await process(self.executable, "-m", str(model), "-f", str(output), input=text.encode())
+            command = (self.executable,) if self.executable else (sys.executable, "-m", "piper")
+            await process(*command, "-m", str(model), "-f", str(output), input=text.encode())
             return output.read_bytes()
 
 

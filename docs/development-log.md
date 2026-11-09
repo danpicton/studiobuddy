@@ -458,3 +458,23 @@ The app and speech backend are active; listener inactive. Operator must run
 `systemctl --user restart studio-buddy.service` to activate the installed update:
 PartOf propagates that restart to the active microphone backend, which the agent
 must not start. Other Mako theme, Sway config, PushTalk and F9 remain unchanged.
+
+## Include Piper in the project environment
+RED (2026-11-09): `QT_QPA_PLATFORM=offscreen uv run --locked pytest
+tests/test_speech.py -q` gives 1 expected failure and 4 passes. With generation
+mocked, the new behavioral test requires Piper to run through the application's
+Python environment; currently it invokes a separate `piper` executable on PATH.
+No audio playback, microphone capture or model inference performed.
+GREEN: all five speech tests pass within the full regression run. Piper is a
+default dependency, locked to 1.8.0, and generation uses the app's Python with
+`-m piper`; an explicitly supplied executable remains supported. No extra runtime
+discovery layer was needed. README and integration/manual-check docs updated.
+Regression: `QT_QPA_PLATFORM=offscreen uv run pytest` passed 155 tests;
+`uv run ruff check` and `git diff --check` passed. `uv run python -m piper --help`
+successfully launched the installed dependency without synthesis or playback.
+Preserved existing lockfile artifact metadata stripped by the older local uv;
+`uv lock --check` passed with only Piper and pathvalidate added.
+Manual Arch/Sway check remains: reinstall the app tool with its existing extras,
+restart the app and use Test Voice with a licensed model/JSON to verify generation
+and normal audio output. No live audio, paid API or microphone checks performed;
+no services restarted.

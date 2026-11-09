@@ -27,7 +27,8 @@ Use a disposable musical session. No project edits should occur.
    account eligibility and inference remain unverified until this check succeeds.
    Optional API mode: explicitly select api with your own API key/billing and test.
    In API mode also verify supported reasoning effort and persistence after restart.
-4. Piper: install a licensed model + JSON, select it, Test Voice; verify normal audio
+4. Piper: sync/install the project (includes piper-tts), install a licensed model +
+   JSON, select it, Test Voice; verify normal audio
    output. While generating/playing press Stop, send another message and switch to Text.
    Old speech must never begin/resume. Remove model temporarily and verify text survives.
 5. ElevenLabs and Hume separately: select a voice you can access, test once (paid),

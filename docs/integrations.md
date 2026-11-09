@@ -5,7 +5,8 @@ Consulted during implementation (2026-11-07):
 - OpenAI official Python SDK README: https://github.com/openai/openai-python
   Responses API, AsyncOpenAI, timeout/retries and output_text. SDK 2.54.0 locked.
 - Piper official CLI: https://github.com/OHF-Voice/piper1-gpl/blob/main/docs/CLI.md
-  `piper -m MODEL -f OUTPUT` with text on stdin. No model downloads in app.
+  App Python runs `-m piper -m MODEL -f OUTPUT` with text on stdin, using the bundled
+  project dependency. No model downloads in app.
 - ElevenLabs official SDK reference and API payload:
   https://github.com/elevenlabs/elevenlabs-python/blob/main/reference.md
   POST `/v1/text-to-speech/{voice_id}`, xi-api-key, voice_settings and MP3 output.

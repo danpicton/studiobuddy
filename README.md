@@ -108,18 +108,17 @@ switch to another cloud provider. A speech failure never removes the text reply.
 
 ### Piper (preferred local voice)
 
-Install the official Piper CLI into an isolated tool environment:
-
-```sh
-uv tool install piper-tts
-```
+Piper is included in the normal project install (`uv sync` for development or
+`uv tool install --reinstall .` for the installed app). Studio Buddy runs it using
+its own Python environment, so no separate Piper CLI installation is needed.
 
 Choose/download a voice yourself; models can be large and have their own licences.
 Studio Buddy never downloads one automatically. Official instructions:
 <https://github.com/OHF-Voice/piper1-gpl/blob/main/docs/CLI.md>.
 Keep the `.onnx` and matching `.onnx.json` together. In Settings choose **piper**,
 then **Choose installed Piper .onnx voice**. Test Voice checks generation and ffplay
-output. `piper` and `ffplay` must be on PATH. Playback uses your normal audio output.
+output. `ffplay` (from the system ffmpeg package) must be on PATH. Playback uses your
+normal audio output.
 Missing executable, model or model configuration produces a visible error.
 
 ### ElevenLabs

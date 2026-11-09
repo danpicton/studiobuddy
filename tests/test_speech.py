@@ -60,6 +60,29 @@ async def test_missing_piper_model():
         await Piper("/does/not/exist.onnx").generate("hello")
 
 
+async def test_piper_uses_project_environment_without_external_cli(tmp_path, monkeypatch):
+    import sys
+    from pathlib import Path
+
+    from studiobuddy import speech
+
+    model = tmp_path / "voice.onnx"
+    model.touch()
+    model.with_suffix(".onnx.json").write_text("{}")
+    calls = []
+
+    async def fake_process(*args, input=None):
+        calls.append((args, input))
+        Path(args[args.index("-f") + 1]).write_bytes(b"generated wav")
+
+    monkeypatch.setattr(speech, "process", fake_process)
+    assert await Piper(str(model)).generate("hello") == b"generated wav"
+    args, text = calls[0]
+    assert args[:3] == (sys.executable, "-m", "piper")
+    assert args[3:5] == ("-m", str(model))
+    assert text == b"hello"
+
+
 async def test_process_cancellation_reaps_child(tmp_path):
     import sys
 
