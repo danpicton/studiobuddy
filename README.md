@@ -2,7 +2,7 @@
 
 A native, local-first musical companion for Renoise. Chat about the loop you have,
 try one next experiment, remember the good bits, and pick up where you left off.
-Python 3.11+, PySide6, SQLite, OpenAI Responses, and Piper / ElevenLabs / Hume
+Python 3.11+, PySide6, SQLite, OpenAI Responses, and Piper / ElevenLabs
 speech. Background voice interaction via a dedicated token-aware speech backend;
 the native UI remains available for settings, projects, notes and text conversation.
 No Renoise editing.
@@ -146,13 +146,9 @@ API keys, spoken text, raw response messages and request headers are excluded fr
 these diagnostics. Malformed, oversized or unsafe error fields fall back to
 `unknown`; the HTTP status is still reported. No global HTTP debug logging is needed.
 
-### Hume
-
-Set `HUME_API_KEY`; choose **hume** and an available voice ID from your Hume Voice
-Library. Add a short delivery description (e.g. “Warm and wry”) and speed 0.75–1.5.
-Uses the official `/v0/tts/file` API with WAV output and one generation. Hume's
-expressive description is distinct from ElevenLabs stability. Voice IDs are entered
-manually; this release does not fetch cloud voice catalogues.
+Older configurations with Hume selected open in Text mode with Piper selected.
+Obsolete Hume settings are discarded on the next settings save; other preferences
+are preserved. Choose Piper or ElevenLabs to enable voice replies again.
 
 ## Background voice on F10 (recommended)
 
@@ -235,11 +231,11 @@ and rejects its transcript instead. Changing sessions, sending text or cancellin
 invalidates the pending transcript. Unsaved editor text remains intact.
 Do not change projects while dictating; select the intended project first in the UI.
 
-`studio-buddy --background` starts hidden and enables speech for that launch using
+`studio-buddy --background` starts hidden and uses the saved Text/Voice mode with
 the saved provider. Normal launch shows the UI; launching again shows the existing
 instance. Closing the background window hides it and keeps the companion running.
 Left-click the tray icon to start recording, then click again to send it for
-transcription and a spoken reply. The icon turns pink/red while starting/recording
+transcription and a reply (spoken when Voice replies is enabled). The icon turns pink/red while starting/recording
 and returns to purple when stopped. Double-click is ignored to avoid an extra
 recording toggle. Right-click for Show Studio Buddy, Hide window, Cancel voice or
 Quit. Tray recording needs `studio-buddy-stt.service` running; it does not require

@@ -31,9 +31,12 @@ Use a disposable musical session. No project edits should occur.
    JSON, select it, Test Voice; verify normal audio
    output. While generating/playing press Stop, send another message and switch to Text.
    Old speech must never begin/resume. Remove model temporarily and verify text survives.
-5. ElevenLabs and Hume separately: select a voice you can access, test once (paid),
+5. ElevenLabs: select a voice you can access, test once (paid),
    verify pronunciation/settings; interrupt while downloading/playing. Test local Piper
    fallback and text fallback. No unselected cloud service should receive text.
+   Confirm Settings offers only Piper/ElevenLabs, and background startup preserves
+   the saved Text/Voice mode. A legacy Hume selection should open in Text mode;
+   other saved preferences should remain intact after saving Settings.
 6. Create two projects/sessions, record favourite/rejected ideas and outcomes, wrap up,
    restart, edit/delete notes; verify isolation, restored goal/history and next-step context.
 7. Renoise: first verify the exact tool's documentation and protocol. This build only

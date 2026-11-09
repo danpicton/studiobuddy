@@ -32,51 +32,22 @@ async def test_eleven_missing_key_and_rate_limit(monkeypatch):
         await voice.generate("hello")
 
 
-async def test_hume_distinct_expressive_request(monkeypatch):
-    from studiobuddy.providers import Hume
-
-    monkeypatch.setenv("HUME_API_KEY", "test")
-
-    def handle(request):
-        assert request.url.path == "/v0/tts/file"
-        assert request.headers["X-Hume-Api-Key"] == "test"
-        data = json.loads(request.content)
-        assert data["utterances"][0]["voice"] == {"id": "voice-2"}
-        assert data["utterances"][0]["description"] == "Warm and wry"
-        assert data["format"] == {"type": "wav"}
-        return httpx.Response(200, content=b"wav")
-
-    assert (
-        await Hume(
-            "voice-2", description="Warm and wry", transport=httpx.MockTransport(handle)
-        ).generate("hello")
-        == b"wav"
-    )
-
-
-async def test_hume_auth_failure(monkeypatch):
-    from studiobuddy.providers import Hume
-
-    monkeypatch.setenv("HUME_API_KEY", "test")
+async def test_eleven_auth_failure(monkeypatch):
+    monkeypatch.setenv("ELEVENLABS_API_KEY", "test")
     with pytest.raises(SpeechError, match="authentication"):
-        await Hume("v", transport=httpx.MockTransport(lambda r: httpx.Response(401))).generate(
+        await ElevenLabs("v", transport=httpx.MockTransport(lambda r: httpx.Response(401))).generate(
             "hello"
         )
 
 
-@pytest.mark.parametrize("provider", ["elevenlabs", "hume"])
-async def test_cloud_timeout_is_safe(provider, monkeypatch):
-    from studiobuddy.providers import Hume
-
+async def test_cloud_timeout_is_safe(monkeypatch):
     monkeypatch.setenv("ELEVENLABS_API_KEY", "test")
-    monkeypatch.setenv("HUME_API_KEY", "test")
 
     def handle(request):
         raise httpx.ConnectTimeout("sensitive remote details")
 
-    cls = ElevenLabs if provider == "elevenlabs" else Hume
     with pytest.raises(SpeechError, match="timed out") as error:
-        await cls("voice", transport=httpx.MockTransport(handle)).generate("hello")
+        await ElevenLabs("voice", transport=httpx.MockTransport(handle)).generate("hello")
     assert "sensitive" not in str(error.value)
 
 

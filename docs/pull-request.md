@@ -3,7 +3,7 @@
 Builds a Python/PySide6 companion from the initial README-only repository. Users can
 chat with OpenAI Responses, resume SQLite projects/sessions, edit explicit musical
 memories and goals, and use coaching actions. Text/voice switching supports Piper,
-ElevenLabs and Hume with cancellable generation/playback and stale-result protection.
+and ElevenLabs with cancellable generation/playback and stale-result protection.
 Includes TOML settings, request safeguards, native dictation-compatible input,
 optional read-only MCP resources, packaging, Arch/Sway documentation and CI.
 

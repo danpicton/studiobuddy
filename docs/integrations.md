@@ -10,10 +10,6 @@ Consulted during implementation (2026-11-07):
 - ElevenLabs official SDK reference and API payload:
   https://github.com/elevenlabs/elevenlabs-python/blob/main/reference.md
   POST `/v1/text-to-speech/{voice_id}`, xi-api-key, voice_settings and MP3 output.
-- Hume official SDK source:
-  https://github.com/HumeAI/hume-python-sdk/blob/main/src/hume/tts/raw_client.py
-  https://github.com/HumeAI/hume-python-sdk/blob/main/src/hume/tts/types/posted_utterance.py
-  POST `/v0/tts/file`, X-Hume-Api-Key, utterances with voice.id, description, speed.
 - Official MCP Python SDK: https://github.com/modelcontextprotocol/python-sdk
   Installed 1.30.0 ClientSession and streamable_http_client interfaces.
 - Requested Renoise page: https://www.renoise.com/tools/renoise-mcp — denied by

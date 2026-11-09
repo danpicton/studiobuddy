@@ -496,3 +496,29 @@ Regression: `QT_QPA_PLATFORM=offscreen uv run pytest` passed 156 tests;
 paid APIs exercised. Manual Arch/Sway verification remains: operator restarts
 studio-buddy.service and confirms tray recording/send notifications. Service
 restart is left to the operator because PartOf restarts the active STT backend.
+
+## Remove Hume speech support
+RED (2026-11-09): `QT_QPA_PLATFORM=offscreen uv run --locked pytest
+tests/test_settings.py -q` gives 4 expected failures and 4 passes. Tests require
+legacy Hume fields to load and disappear on save, existing Piper/ElevenLabs
+preferences to survive migration, a selected Hume provider to switch to text
+mode with Piper selected, and settings to offer/accept only supported providers.
+No network, audio playback or microphone capture used.
+Additional RED: startup tests expose background mode unconditionally forcing
+voice on, overriding the migrated text preference. The settings run now gives
+2 expected failures and 9 passes. Honor the saved mode at background startup so
+migration does not silently select a different speaking provider.
+GREEN: 32 focused settings/cloud voice tests pass. Removed the Hume adapter,
+settings fields/choice/key indicator, example configuration and active integration
+instructions. Retained only explicit load-time migration and its tests; unrelated
+unknown fields still fail validation. Existing Piper/ElevenLabs selections and
+voice mode are preserved. Background startup now honors that saved voice mode.
+Refactor: simplified the remaining stability widget range and retained shared
+HTTP/cancellation handling. Historical log entries remain as implementation history.
+Regression: `QT_QPA_PLATFORM=offscreen uv run pytest` passed 161 tests;
+`uv run ruff check` and `git diff --check` passed. Installed with
+`uv tool install --reinstall '.[speech,renoise]'`. No live audio, microphone,
+paid API or desktop notification checks performed. Manual Arch/Sway check remains:
+operator restarts studio-buddy.service, verifies the reduced settings UI and
+saved Voice replies selection, and tests their selected provider. No services
+restarted by the agent because app restart propagates to the active STT backend.

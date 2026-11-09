@@ -518,8 +518,6 @@ def main():
     from pathlib import Path
 
     data = Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local/share")) / "studio-buddy"
-    from dataclasses import replace
-
     from PySide6.QtCore import QLockFile
 
     from .voice_input import VoiceServer, request, runtime_path
@@ -560,7 +558,6 @@ def main():
         tray.show()
         notifications = DesktopNotifications(window)
         window.status.textChanged.connect(notifications.notify)
-        window.apply_settings(replace(window.settings, voice_mode=True), save=False)
     else:
         window.show()
     try:

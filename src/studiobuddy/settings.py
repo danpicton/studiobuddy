@@ -29,9 +29,6 @@ class Settings:
     eleven_voice: str = ""
     eleven_model: str = "eleven_multilingual_v2"
     eleven_stability: float = 0.5
-    hume_voice: str = ""
-    hume_description: str = "Warm, conversational, a little wry"
-    hume_speed: float = 1.0
     fallback: str = "text"
     theme: str = "dark"
     mcp_enabled: bool = False
@@ -49,14 +46,14 @@ class Settings:
                 raise ValueError(f"Invalid type for {key}")
         if (
             self.ai_mode not in ("chatgpt", "api")
-            or self.provider not in ("piper", "elevenlabs", "hume")
+            or self.provider not in ("piper", "elevenlabs")
             or self.fallback not in ("text", "piper")
             or self.theme not in ("dark", "system")
         ):
             raise ValueError("Invalid provider, fallback or theme")
         if not 1 <= self.request_limit <= 10000 or not 50 <= self.max_output_tokens <= 2000:
             raise ValueError("Request limit must be 1–10000; output limit 50–2000 tokens")
-        if not 0 <= self.eleven_stability <= 1 or not 0.75 <= self.hume_speed <= 1.5:
+        if not 0 <= self.eleven_stability <= 1:
             raise ValueError("Voice settings out of range")
         if self.reasoning_effort not in (
             "default",
@@ -82,6 +79,12 @@ class Settings:
             return cls()
         with open(path, "rb") as stream:
             values = tomllib.load(stream)
+        # Old releases wrote these fields even when another provider was selected.
+        for field in ("hume_voice", "hume_description", "hume_speed"):
+            values.pop(field, None)
+        if values.get("provider") == "hume":
+            values["provider"] = "piper"
+            values["voice_mode"] = False
         try:
             return cls(**values).validate()
         except TypeError:
@@ -106,11 +109,9 @@ class Settings:
                 os.unlink(temporary)
 
     def speech_provider(self):
-        from .providers import ElevenLabs, Hume
+        from .providers import ElevenLabs
         from .speech import Piper
 
         if self.provider == "elevenlabs":
             return ElevenLabs(self.eleven_voice, self.eleven_model, self.eleven_stability)
-        if self.provider == "hume":
-            return Hume(self.hume_voice, self.hume_description, self.hume_speed)
         return Piper(self.piper_model)

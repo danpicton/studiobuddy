@@ -32,7 +32,7 @@ class SettingsDialog(QDialog):
         layout = QVBoxLayout(self)
         status = ", ".join(
             f"{key}: {'set' if os.environ.get(key) else 'missing'}"
-            for key in ("OPENAI_API_KEY", "ELEVENLABS_API_KEY", "HUME_API_KEY")
+            for key in ("OPENAI_API_KEY", "ELEVENLABS_API_KEY")
         )
         label = QLabel(
             status
@@ -48,7 +48,7 @@ class SettingsDialog(QDialog):
         choices = {
             "reasoning_effort": ["default", "none", "minimal", "low", "medium", "high", "xhigh"],
             "ai_mode": ["chatgpt", "api"],
-            "provider": ["piper", "elevenlabs", "hume"],
+            "provider": ["piper", "elevenlabs"],
             "fallback": ["text", "piper"],
             "theme": ["dark", "system"],
         }
@@ -66,7 +66,7 @@ class SettingsDialog(QDialog):
                 field.setValue(value)
             elif isinstance(value, float):
                 field = QDoubleSpinBox()
-                field.setRange(*((0, 1) if key == "eleven_stability" else (0.75, 1.5)))
+                field.setRange(0, 1)
                 field.setSingleStep(0.05)
                 field.setValue(value)
             else:
