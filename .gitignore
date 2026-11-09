@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+.env
+*.sqlite*
+chatgpt-auth.json*
+.chatgpt-*
+piper_voices/

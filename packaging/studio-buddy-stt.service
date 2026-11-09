@@ -1,0 +1,25 @@
+# Requires Studio Buddy installed with its optional speech extra.
+# Deliberately independent of sttd.service and all existing F9 configuration.
+[Unit]
+Description=Studio Buddy token-aware speech recognition
+Requires=studio-buddy.service
+After=studio-buddy.service
+PartOf=studio-buddy.service
+
+[Service]
+Type=exec
+Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin
+# RuntimeDirectory ensures the private parent exists even during app startup.
+RuntimeDirectory=studio-buddy
+RuntimeDirectoryMode=0700
+RuntimeDirectoryPreserve=yes
+ExecStart=%h/.local/bin/studio-buddy-stt --model small.en --compute-type int8 --threads 4 --max-duration 120
+# Revoke GUI acceptance after crashes/SIGKILL too. PushTalk/F9 are independent.
+ExecStopPost=-%h/.local/bin/studio-buddy-voice cancel
+TimeoutStopSec=10
+Restart=on-failure
+RestartSec=2
+MemoryMax=6G
+
+[Install]
+WantedBy=graphical-session.target
