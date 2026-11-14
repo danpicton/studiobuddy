@@ -557,3 +557,26 @@ fast replies, and cancel a thinking reply. Live ChatGPT plan usage and separatel
 billed API model/reasoning compatibility require operator checks; reasoning may
 need a larger output budget. Marked the completed item in the local ignored
 todo.md without adding that private backlog to version control.
+
+## Automatic fast-to-thinking handoff
+RED (2026-11-14): `QT_QPA_PLATFORM=offscreen uv run pytest
+ tests/test_thinking.py -q` produced 5 expected failures and 2 passes. The manual
+selector does not recognize escalation, reserve the second request, suppress
+internal routing text, or cancel a thinking stage. Tests now specify automatic
+fast-first replies, identical context across handoff, combined token reporting,
+persisted shared budgets, cancellation at either stage and bounded plan routing.
+GREEN: 24 focused handoff/provider/account tests passed. Added regressions using
+real subscription SSE parsing over mocked HTTP and thinking-stage failure/no
+speech. Refactor: ReplyTurn in routing.py owns model snapshots, routing prompt,
+single-hop protocol and combined usage; Qt owns durable request reservations and
+worker scheduling. Both adapters accept per-request instructions without new
+tools or API contracts. Removed the manual Think control. Every new turn starts
+fast; an exact whole-response handoff marker triggers at most one thinking call
+with identical original context. Internal routing output is never stored/spoken.
+Full regression: `QT_QPA_PLATFORM=offscreen uv run pytest` passed 170 tests;
+`uv run ruff check` passed after correcting import order and an exception variable
+name flagged by the first lint run. No live model calls, microphone or audio tests.
+Manual checks remaining: Arch/Sway UI, choose both models and confirm realistic
+fast/direct versus complex/delegated replies, live ChatGPT plan/API compatibility,
+latency and judgment quality. Routing is model judgment, not a guaranteed quality
+classifier. API reasoning may require a larger output-token budget.

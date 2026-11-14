@@ -6,7 +6,7 @@ ai_mode = "chatgpt"
 chatgpt_model = ""
 chatgpt_thinking_model = ""
 model = "gpt-4.1-mini"
-# Blank until you choose a thinking model; Think never guesses a model.
+# Optional: fast replies can automatically hand off to this model.
 thinking_model = ""
 request_limit = 100
 max_output_tokens = 300

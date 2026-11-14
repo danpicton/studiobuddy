@@ -28,6 +28,8 @@ class AIError(Exception):
 
 
 class OpenAIBackend:
+    instructions = SYSTEM_PROMPT
+
     def __init__(
         self,
         model="gpt-4.1-mini",
@@ -59,7 +61,7 @@ class OpenAIBackend:
         try:
             response = await client.responses.create(
                 model=self.model,
-                instructions=SYSTEM_PROMPT,
+                instructions=self.instructions,
                 input=[
                     {
                         "role": "user",

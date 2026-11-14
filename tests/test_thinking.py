@@ -30,14 +30,22 @@ def test_old_settings_keep_fast_model_and_thinking_settings_roundtrip(qtbot, tmp
         Settings(thinking_reasoning_effort="invalid").validate()
 
 
-def test_api_think_routes_one_message_then_returns_to_fast(qtbot, tmp_path):
-    create = AsyncMock(return_value=SimpleNamespace(output_text="Keep the bass.", usage=None))
+def test_fast_model_can_answer_or_handoff_automatically(qtbot, tmp_path):
+    marker = "[[STUDIO_BUDDY_HANDOFF]]"
+    create = AsyncMock(
+        side_effect=[
+            SimpleNamespace(output_text="Quick answer", usage=SimpleNamespace(total_tokens=3)),
+            SimpleNamespace(output_text=marker, usage=SimpleNamespace(total_tokens=4)),
+            SimpleNamespace(output_text="Deep answer", usage=SimpleNamespace(total_tokens=8)),
+            SimpleNamespace(output_text="Quick again", usage=None),
+        ]
+    )
     config = tmp_path / "config.toml"
     Settings(
         ai_mode="api",
         model="fast",
         thinking_model="strong",
-        reasoning_effort="low",
+        reasoning_effort="none",
         thinking_reasoning_effort="high",
     ).save(config)
     window = Window(
@@ -45,98 +53,185 @@ def test_api_think_routes_one_message_then_returns_to_fast(qtbot, tmp_path):
         settings_path=config,
     )
     qtbot.addWidget(window)
-    window.think.setChecked(True)
-    window.input.setPlainText("Consider the arrangement")
-    window.send_message()
-    assert not window.think.isChecked()
+    window.send_message(text="Hello")
     qtbot.waitUntil(lambda: len(window.messages) == 2)
-    assert create.call_args.kwargs["model"] == "strong"
-    assert create.call_args.kwargs["reasoning"] == {"effort": "high"}
-    window.send_message(text="Quick follow-up")
+    window.renoise_context = "Observed tempo 120"
+    window.send_message(text="Consider the arrangement")
     qtbot.waitUntil(lambda: len(window.messages) == 4)
+    calls = [c.kwargs for c in create.call_args_list]
+    assert [c["model"] for c in calls] == ["fast", "fast", "strong"]
+    assert calls[1]["input"] == calls[2]["input"]
+    assert marker in calls[1]["instructions"]
+    assert marker not in calls[2]["instructions"]
+    assert calls[2]["reasoning"] == {"effort": "high"}
+    assert window.messages[-1]["content"] == "Deep answer"
+    assert marker not in window.history.toPlainText()
+    assert "12 tokens" in window.status.text()
+    assert window.store.state(f"requests:{window.session_id}") == "3"
+    window.send_message(text="Thanks")
+    qtbot.waitUntil(lambda: len(window.messages) == 6)
     assert create.call_args.kwargs["model"] == "fast"
-    assert create.call_args.kwargs["reasoning"] == {"effort": "low"}
-    assert window.store.state(f"requests:{window.session_id}") == "2"
 
 
-def test_unconfigured_thinking_preserves_draft_and_request_budget(qtbot):
-    window = Window(ai=OpenAIBackend())
-    qtbot.addWidget(window)
-    window.think.setChecked(True)
-    window.input.setPlainText("Keep this draft")
-    window.send_message()
-    assert window.messages == []
-    assert window.input.toPlainText() == "Keep this draft"
-    assert "thinking model" in window.status.text().lower()
-    assert window.store.state(f"requests:{window.session_id}") is None
+def test_handoff_respects_remaining_budget_and_survives_restart(qtbot, tmp_path):
+    from studiobuddy.storage import Store
 
-
-def test_plan_choices_save_and_route_thinking_without_api_fallback(qtbot, tmp_path, monkeypatch):
-    from test_chatgpt_desktop import Account
-
-    class Models(Account):
-        async def models(self):
-            return [("fast-plan", "Fast"), ("strong-plan", "Strong")]
-
-    seen = []
-
-    async def reply(self, messages, context=""):
-        seen.append(self.model)
-        return {"text": "Keep the bass", "tokens": 1}
-
-    monkeypatch.setattr(ChatGPTBackend, "reply", reply)
-    config = tmp_path / "config.toml"
-    window = Window(auth=Models(), settings_path=config)
-    qtbot.addWidget(window)
-    window.account.connect_button.click()
-    qtbot.waitUntil(lambda: window.account.models.count() == 2)
-    window.account.thinking_models.setCurrentIndex(
-        window.account.thinking_models.findData("strong-plan")
+    create = AsyncMock(
+        return_value=SimpleNamespace(output_text="[[STUDIO_BUDDY_HANDOFF]]", usage=None)
     )
-    assert Settings.load(config).chatgpt_thinking_model == "strong-plan"
-    window.think.setChecked(True)
-    window.send_message(text="Think about this")
-    qtbot.waitUntil(lambda: len(window.messages) == 2)
-    window.send_message(text="Quick reply")
-    qtbot.waitUntil(lambda: len(window.messages) == 4)
-    assert seen == ["strong-plan", "fast-plan"]
+    config = tmp_path / "config.toml"
+    Settings(ai_mode="api", model="fast", thinking_model="strong", request_limit=1).save(config)
+    window = Window(
+        ai=OpenAIBackend(client=SimpleNamespace(responses=SimpleNamespace(create=create))),
+        settings_path=config,
+        store=Store(tmp_path / "db"),
+    )
+    qtbot.addWidget(window)
+    window.send_message(text="Think carefully")
+    qtbot.waitUntil(lambda: "limit reached" in window.status.text())
+    assert create.await_count == 1
+    assert len(window.messages) == 1
     window.close()
-    restored = Window(auth=Models(), settings_path=config)
+    restored = Window(
+        ai=OpenAIBackend(client=SimpleNamespace(responses=SimpleNamespace(create=create))),
+        settings_path=config,
+        store=Store(tmp_path / "db"),
+    )
     qtbot.addWidget(restored)
-    assert restored.account.preferred_thinking_model == "strong-plan"
+    restored.send_message(text="Again")
+    assert create.await_count == 1
+    assert "limit reached" in restored.status.text()
 
 
-def test_cancelled_thinking_reply_cannot_replace_fast_reply(qtbot, tmp_path, monkeypatch):
+@pytest.mark.parametrize("stage", ["fast", "strong"])
+def test_cancellation_prevents_late_handoff_or_reply(qtbot, tmp_path, monkeypatch, stage):
     import asyncio
     import threading
 
-    started = threading.Event()
-    release = threading.Event()
+    started, release, finished = threading.Event(), threading.Event(), threading.Event()
     config = tmp_path / "config.toml"
     Settings(ai_mode="api", model="fast", thinking_model="strong").save(config)
     seen = []
 
     async def reply(self, messages, context=""):
-        if self.model == "strong":
+        seen.append(self.model)
+        if self.model == stage:
             started.set()
             try:
                 await asyncio.sleep(60)
             except asyncio.CancelledError:
                 while not release.is_set():
                     await asyncio.sleep(0.001)
-            seen.append(self.model)
-            return {"text": "Stale thinking", "tokens": 1}
-        return {"text": "Fast answer", "tokens": 1}
+            finished.set()
+        return {
+            "text": "[[STUDIO_BUDDY_HANDOFF]]" if self.model == "fast" else "Late answer",
+            "tokens": 1,
+        }
 
     monkeypatch.setattr(OpenAIBackend, "reply", reply)
     window = Window(ai=OpenAIBackend(), settings_path=config)
     qtbot.addWidget(window)
-    window.think.setChecked(True)
     window.send_message(text="Think")
     qtbot.waitUntil(started.is_set)
-    window.send_message(text="Quick instead")
+    window.cancel()
     release.set()
-    qtbot.waitUntil(lambda: bool(seen) and len(window.messages) == 3)
-    assert seen == ["strong"]
-    assert window.messages[-1]["content"] == "Fast answer"
-    assert "Stale thinking" not in window.history.toPlainText()
+    qtbot.waitUntil(finished.is_set)
+    qtbot.wait(30)
+    assert seen == (["fast"] if stage == "fast" else ["fast", "strong"])
+    assert len(window.messages) == 1
+
+
+def test_plan_handoff_stays_on_plan_and_cannot_recurse(qtbot, tmp_path, monkeypatch):
+    from test_chatgpt_desktop import Account
+
+    async def reply(self, messages, context=""):
+        seen.append(self.model)
+        return {"text": "[[STUDIO_BUDDY_HANDOFF]]", "tokens": 1}
+
+    seen = []
+    monkeypatch.setattr(ChatGPTBackend, "reply", reply)
+    config = tmp_path / "config.toml"
+    Settings(chatgpt_model="fast-plan", chatgpt_thinking_model="strong-plan").save(config)
+    window = Window(auth=Account(), settings_path=config)
+    qtbot.addWidget(window)
+    window.send_message(text="Deep question")
+    qtbot.waitUntil(lambda: "could not" in window.status.text().lower())
+    assert seen == ["fast-plan", "strong-plan"]
+    assert len(window.messages) == 1
+
+
+def test_unconfigured_thinking_uses_fast_normally(qtbot, monkeypatch):
+    async def reply(self, messages, context=""):
+        assert "[[STUDIO_BUDDY_HANDOFF]]" not in self.instructions
+        return {"text": "Hello", "tokens": 1}
+
+    monkeypatch.setattr(OpenAIBackend, "reply", reply)
+    window = Window(ai=OpenAIBackend())
+    qtbot.addWidget(window)
+    window.send_message(text="Hi")
+    qtbot.waitUntil(lambda: len(window.messages) == 2)
+
+
+def test_plan_handoff_uses_real_adapter_with_mock_http(qtbot, tmp_path):
+    import json
+
+    import httpx
+    from test_chatgpt_ai import sse
+
+    auth = SimpleNamespace(access_token=AsyncMock(return_value="test-only"))
+    payloads = []
+
+    def handle(request):
+        payload = json.loads(request.content)
+        payloads.append(payload)
+        text = "[[STUDIO_BUDDY_HANDOFF]]" if len(payloads) == 1 else "Deep plan answer"
+        return httpx.Response(
+            200,
+            headers={"content-type": "text/event-stream"},
+            content=sse(
+                [
+                    {"type": "response.output_text.delta", "delta": text},
+                    {"type": "response.completed", "response": {"usage": {"total_tokens": 5}}},
+                ]
+            ),
+        )
+
+    config = tmp_path / "config.toml"
+    Settings(chatgpt_model="fast-plan", chatgpt_thinking_model="strong-plan").save(config)
+    window = Window(
+        ai=ChatGPTBackend(auth, transport=httpx.MockTransport(handle)), settings_path=config
+    )
+    qtbot.addWidget(window)
+    window.send_message(text="Consider this")
+    qtbot.waitUntil(lambda: len(window.messages) == 2)
+    assert [p["model"] for p in payloads] == ["fast-plan", "strong-plan"]
+    assert "[[STUDIO_BUDDY_HANDOFF]]" in payloads[0]["instructions"]
+    assert "[[STUDIO_BUDDY_HANDOFF]]" not in payloads[1]["instructions"]
+    assert all("tools" not in p for p in payloads)
+    assert "10 tokens" in window.status.text()
+
+
+def test_thinking_failure_counts_attempt_without_speaking_internal_marker(qtbot, tmp_path):
+    from studiobuddy.ai import AIError
+
+    create = AsyncMock(
+        side_effect=[
+            SimpleNamespace(output_text="[[STUDIO_BUDDY_HANDOFF]]", usage=None),
+            AIError("Thinking unavailable"),
+        ]
+    )
+    config = tmp_path / "config.toml"
+    Settings(ai_mode="api", model="fast", thinking_model="strong").save(config)
+    window = Window(
+        ai=OpenAIBackend(client=SimpleNamespace(responses=SimpleNamespace(create=create))),
+        settings_path=config,
+    )
+    qtbot.addWidget(window)
+    say = AsyncMock()
+    window.speech.say = say
+    window.send_message(text="Consider this")
+    qtbot.waitUntil(lambda: "Thinking unavailable" in window.status.text())
+    assert create.await_count == 2
+    assert window.store.state(f"requests:{window.session_id}") == "2"
+    assert len(window.messages) == 1
+    assert not say.called

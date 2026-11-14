@@ -1,5 +1,4 @@
 import sys
-from copy import copy
 
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtWidgets import (
@@ -24,6 +23,7 @@ from .chatgpt_ai import ChatGPTBackend
 from .chatgpt_auth import ChatGPTAuth
 from .memory_ui import NotesDialog
 from .renoise import ContextError, Renoise
+from .routing import ReplyTurn
 from .runner import Runner
 from .settings import Settings, config_path
 from .settings_ui import SettingsDialog
@@ -83,6 +83,7 @@ class Window(QMainWindow):
         self.token = 0
         self.closed = False
         self.pending = None
+        self.reply_turn = None
         self.runner = Runner()
         self.runner.done.connect(self.received)
         self.context_runner = Runner()
@@ -127,9 +128,8 @@ class Window(QMainWindow):
         )
         self.input.setMaximumHeight(110)
         self.layout.addWidget(self.input)
-        self.think = QCheckBox("Think · next message")
-        self.think.setToolTip("Use your saved thinking model for the next message only.")
-        self.layout.addWidget(self.think)
+        self.routing_status = QLabel("Fast replies · automatic thinking handoff when configured")
+        self.layout.addWidget(self.routing_status)
         self.send = QPushButton("Send")
         self.send.clicked.connect(self.send_message)
         self.input.submitted.connect(self.send_message)
@@ -443,29 +443,6 @@ class Window(QMainWindow):
         text = (self.input.toPlainText() if from_editor else text).strip()
         if not text:
             return
-        # Snapshot routing before scheduling: later UI changes cannot alter this request.
-        backend = self.ai
-        if isinstance(backend, OpenAIBackend):
-            backend = copy(backend)
-            thinking = self.think.isChecked()
-            if isinstance(backend, ChatGPTBackend):
-                backend.model = (
-                    self.settings.chatgpt_thinking_model
-                    if thinking
-                    else self.settings.chatgpt_model
-                )
-            else:
-                backend.model = self.settings.thinking_model if thinking else self.settings.model
-                backend.reasoning_effort = (
-                    self.settings.thinking_reasoning_effort
-                    if thinking
-                    else self.settings.reasoning_effort
-                )
-            if thinking and not backend.model.strip():
-                self.status.setText(
-                    "Choose a thinking model in the account panel or Settings first."
-                )
-                return
         self.cancel(update_status=False)
         self.store.message(self.session_id, "user", text)
         self.messages.append({"role": "user", "content": text})
@@ -473,36 +450,48 @@ class Window(QMainWindow):
         if from_editor:
             self.input.clear()
         self.render()
-        if isinstance(self.ai, OpenAIBackend):
+        self.reply_turn = ReplyTurn.prepare(
+            self.ai,
+            self.settings,
+            list(self.messages),
+            compose_context(
+                self.store.context(self.project_id, self.session_id), self.renoise_context
+            ),
+        )
+        if not self.submit_reply(self.reply_turn.fast):
+            return
+        if self.renoise_context:
+            self.renoise_context = ""
+            self.context_status.setText("Renoise · snapshot used; read again to refresh")
+
+    def submit_reply(self, backend):
+        if isinstance(backend, OpenAIBackend):
             used = int(self.store.state(f"requests:{self.session_id}") or 0)
             self.ai.requests = used
             backend.requests = used
             if used >= self.settings.request_limit:
+                self.reply_turn = None
                 self.status.setText(
                     "Session request limit reached. Adjust Settings or start a new session."
                 )
-                return
+                return False
             self.store.state(f"requests:{self.session_id}", used + 1)
-        self.think.setChecked(False)
-        self.status.setText("Thinking…")
+        self.status.setText("Thinking more deeply…" if self.reply_turn.delegated else "Thinking…")
         self.pending = self.runner.submit(
             self.token,
             backend.reply(
-                list(self.messages),
-                compose_context(
-                    self.store.context(self.project_id, self.session_id), self.renoise_context
-                ),
+                self.reply_turn.messages,
+                self.reply_turn.context,
             ),
         )
-        if self.renoise_context:
-            self.renoise_context = ""
-            self.context_status.setText("Renoise · snapshot used; read again to refresh")
+        return True
 
     def cancel(self, *, update_status=True):
         if self.account:
             self.account.cancel()
         self.speech_runner.submit(0, self.speech.stop())
         self.token += 1
+        self.reply_turn = None
         if update_status and hasattr(self, "status"):
             self.status.setText("Ready · interrupted")
         if self.pending:
@@ -512,12 +501,25 @@ class Window(QMainWindow):
         if token != self.token:
             return
         if error:
+            self.reply_turn = None
             self.status.setText(
                 str(error)
                 if isinstance(error, AIError)
                 else "Couldn't get a reply. Check your connection and settings."
             )
             return
+        if self.reply_turn:
+            try:
+                handoff = self.reply_turn.accept(result)
+            except AIError as routing_error:
+                self.reply_turn = None
+                self.status.setText(str(routing_error))
+                return
+            if handoff:
+                self.submit_reply(self.reply_turn.strong)
+                return
+            result = {**result, "tokens": self.reply_turn.tokens}
+            self.reply_turn = None
         self.store.message(self.session_id, "assistant", result["text"])
         self.messages.append({"role": "assistant", "content": result["text"]})
         self.render()

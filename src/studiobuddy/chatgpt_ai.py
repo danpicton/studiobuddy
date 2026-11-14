@@ -7,7 +7,6 @@ from openai import AsyncOpenAI, AuthenticationError, RateLimitError
 
 from .ai import CONTEXT_LIMIT, AIError, OpenAIBackend
 from .chatgpt_auth import RESOURCE, AuthError
-from .personality import SYSTEM_PROMPT
 
 
 class ChatGPTBackend(OpenAIBackend):
@@ -38,7 +37,7 @@ class ChatGPTBackend(OpenAIBackend):
                 ) as client:
                     stream = await client.responses.create(
                         model=self.model,
-                        instructions=SYSTEM_PROMPT
+                        instructions=self.instructions
                         + f"\nAim for at most {self.max_output_tokens} output tokens.",
                         input=[
                             {
