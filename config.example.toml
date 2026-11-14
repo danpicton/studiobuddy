@@ -1,9 +1,13 @@
 # Reasoning is model-specific. default omits the API parameter.
 # Choose an effort supported by your model; reasoning uses output tokens too.
 reasoning_effort = "default"
+thinking_reasoning_effort = "default"
 ai_mode = "chatgpt"
 chatgpt_model = ""
+chatgpt_thinking_model = ""
 model = "gpt-4.1-mini"
+# Blank until you choose a thinking model; Think never guesses a model.
+thinking_model = ""
 request_limit = 100
 max_output_tokens = 300
 voice_mode = false

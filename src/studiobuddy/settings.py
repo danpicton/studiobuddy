@@ -19,8 +19,11 @@ def config_path():
 class Settings:
     ai_mode: str = "chatgpt"
     chatgpt_model: str = ""
+    chatgpt_thinking_model: str = ""
     model: str = "gpt-4.1-mini"
+    thinking_model: str = ""
     reasoning_effort: str = "default"
+    thinking_reasoning_effort: str = "default"
     request_limit: int = 100
     max_output_tokens: int = 300
     voice_mode: bool = False
@@ -55,14 +58,18 @@ class Settings:
             raise ValueError("Request limit must be 1–10000; output limit 50–2000 tokens")
         if not 0 <= self.eleven_stability <= 1:
             raise ValueError("Voice settings out of range")
-        if self.reasoning_effort not in (
-            "default",
-            "none",
-            "minimal",
-            "low",
-            "medium",
-            "high",
-            "xhigh",
+        if any(
+            effort
+            not in (
+                "default",
+                "none",
+                "minimal",
+                "low",
+                "medium",
+                "high",
+                "xhigh",
+            )
+            for effort in (self.reasoning_effort, self.thinking_reasoning_effort)
         ):
             raise ValueError("Invalid reasoning effort")
         if not self.model.strip():

@@ -1,4 +1,5 @@
 import sys
+from copy import copy
 
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtWidgets import (
@@ -126,6 +127,9 @@ class Window(QMainWindow):
         )
         self.input.setMaximumHeight(110)
         self.layout.addWidget(self.input)
+        self.think = QCheckBox("Think · next message")
+        self.think.setToolTip("Use your saved thinking model for the next message only.")
+        self.layout.addWidget(self.think)
         self.send = QPushButton("Send")
         self.send.clicked.connect(self.send_message)
         self.input.submitted.connect(self.send_message)
@@ -177,9 +181,15 @@ class Window(QMainWindow):
         settings_button.clicked.connect(self.open_settings)
         self.layout.addWidget(settings_button)
         if self.auth:
-            self.account = AccountPanel(self.auth, self.settings.chatgpt_model, self)
+            self.account = AccountPanel(
+                self.auth,
+                self.settings.chatgpt_model,
+                self,
+                preferred_thinking_model=self.settings.chatgpt_thinking_model,
+            )
             self.account.changing.connect(self.cancel)
             self.account.model_selected.connect(self.select_chatgpt_model)
+            self.account.thinking_model_selected.connect(self.select_chatgpt_thinking_model)
             self.layout.insertWidget(1, self.account)
         self.apply_settings(self.settings, save=False)
         if self.account and self.settings.ai_mode == "chatgpt":
@@ -196,6 +206,12 @@ class Window(QMainWindow):
         self.settings.chatgpt_model = model
         if isinstance(self.ai, ChatGPTBackend):
             self.ai.model = model
+        if self.settings_path:
+            self.settings.save(self.settings_path)
+
+    def select_chatgpt_thinking_model(self, model):
+        self.cancel()
+        self.settings.chatgpt_thinking_model = model
         if self.settings_path:
             self.settings.save(self.settings_path)
 
@@ -427,6 +443,29 @@ class Window(QMainWindow):
         text = (self.input.toPlainText() if from_editor else text).strip()
         if not text:
             return
+        # Snapshot routing before scheduling: later UI changes cannot alter this request.
+        backend = self.ai
+        if isinstance(backend, OpenAIBackend):
+            backend = copy(backend)
+            thinking = self.think.isChecked()
+            if isinstance(backend, ChatGPTBackend):
+                backend.model = (
+                    self.settings.chatgpt_thinking_model
+                    if thinking
+                    else self.settings.chatgpt_model
+                )
+            else:
+                backend.model = self.settings.thinking_model if thinking else self.settings.model
+                backend.reasoning_effort = (
+                    self.settings.thinking_reasoning_effort
+                    if thinking
+                    else self.settings.reasoning_effort
+                )
+            if thinking and not backend.model.strip():
+                self.status.setText(
+                    "Choose a thinking model in the account panel or Settings first."
+                )
+                return
         self.cancel(update_status=False)
         self.store.message(self.session_id, "user", text)
         self.messages.append({"role": "user", "content": text})
@@ -437,16 +476,18 @@ class Window(QMainWindow):
         if isinstance(self.ai, OpenAIBackend):
             used = int(self.store.state(f"requests:{self.session_id}") or 0)
             self.ai.requests = used
+            backend.requests = used
             if used >= self.settings.request_limit:
                 self.status.setText(
                     "Session request limit reached. Adjust Settings or start a new session."
                 )
                 return
             self.store.state(f"requests:{self.session_id}", used + 1)
+        self.think.setChecked(False)
         self.status.setText("Thinking…")
         self.pending = self.runner.submit(
             self.token,
-            self.ai.reply(
+            backend.reply(
                 list(self.messages),
                 compose_context(
                     self.store.context(self.project_id, self.session_id), self.renoise_context

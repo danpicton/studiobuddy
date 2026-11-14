@@ -11,12 +11,14 @@ from .runner import Runner
 class AccountPanel(QWidget):
     changing = Signal()
     model_selected = Signal(str)
+    thinking_model_selected = Signal(str)
     browser_requested = Signal(int, str)
 
-    def __init__(self, auth, preferred_model="", parent=None):
+    def __init__(self, auth, preferred_model="", parent=None, *, preferred_thinking_model=""):
         super().__init__(parent)
         self.auth = auth
         self.preferred_model = preferred_model
+        self.preferred_thinking_model = preferred_thinking_model
         self.token = 0
         self.pending = None
         self.closed = False
@@ -43,6 +45,7 @@ class AccountPanel(QWidget):
         self.models = QComboBox()
         self.models.setPlaceholderText("Choose a ChatGPT model after signing in")
         self.models.currentIndexChanged.connect(self.select_model)
+        row.addWidget(QLabel("Fast"))
         row.addWidget(self.models)
         refresh = QPushButton("Refresh models")
         refresh.clicked.connect(lambda: self.start("refresh"))
@@ -53,18 +56,28 @@ class AccountPanel(QWidget):
         )
         row.addWidget(manage)
         layout.addLayout(row)
+        row = QHBoxLayout()
+        row.addWidget(QLabel("Thinking"))
+        self.thinking_models = QComboBox()
+        self.thinking_models.addItem("Choose a thinking model", "")
+        self.thinking_models.currentIndexChanged.connect(self.select_thinking_model)
+        row.addWidget(self.thinking_models)
+        layout.addLayout(row)
 
     def select_model(self, index):
         if index >= 0:
             self.preferred_model = self.models.itemData(index)
             self.model_selected.emit(self.preferred_model)
 
+    def select_thinking_model(self, index):
+        if index >= 0:
+            self.preferred_thinking_model = self.thinking_models.itemData(index)
+            self.thinking_model_selected.emit(self.preferred_thinking_model)
+
     def open_browser(self, token, url):
         if not self.closed and token == self.token and not QDesktopServices.openUrl(QUrl(url)):
             self.cancel()
-            self.status.setText(
-                "Could not open your browser. Check your desktop browser settings."
-            )
+            self.status.setText("Could not open your browser. Check your desktop browser settings.")
 
     def start(self, operation):
         self.changing.emit()
@@ -107,6 +120,9 @@ class AccountPanel(QWidget):
         self.pending = None
         if error:
             self.models.clear()
+            self.thinking_models.blockSignals(True)
+            self.thinking_models.clear()
+            self.thinking_models.blockSignals(False)
             self.status.setText(
                 str(error)
                 if isinstance(error, AuthError)
@@ -114,6 +130,16 @@ class AccountPanel(QWidget):
             )
             return
         label, models, message = result
+        self.thinking_models.blockSignals(True)
+        self.thinking_models.clear()
+        self.thinking_models.addItem("Choose a thinking model", "")
+        for slug, name in models:
+            self.thinking_models.addItem(name, slug)
+        index = self.thinking_models.findData(self.preferred_thinking_model)
+        self.thinking_models.setCurrentIndex(max(0, index))
+        self.thinking_models.blockSignals(False)
+        if models:
+            self.select_thinking_model(self.thinking_models.currentIndex())
         self.models.blockSignals(True)
         self.models.clear()
         for slug, name in models:

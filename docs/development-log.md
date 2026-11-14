@@ -533,3 +533,27 @@ GREEN: `git check-ignore` now lists both voice files. Regression:
 `QT_QPA_PLATFORM=offscreen uv run pytest` passed 161 tests;
 `uv run ruff check` and `git diff --check` passed. No runtime code changed,
 services restarted, microphone capture or paid API calls performed.
+
+## Fast chat and deliberate thinking models
+RED (2026-11-14): `QT_QPA_PLATFORM=offscreen uv run pytest
+ tests/test_thinking.py -q` failed four tests as expected: missing saved thinking
+model fields, one-message Think control and account thinking-model selector.
+Tests cover legacy settings, independent API reasoning, plan model persistence,
+request accounting and preserving drafts when thinking is unconfigured.
+The initial sandbox run could not access uv's cache; the authorized rerun produced
+these expected failures. No network inference, audio or microphone use.
+GREEN: focused thinking/account tests passed (6 tests). Added a cancellation
+regression proving a cancelled thinking reply retains its original model and
+cannot replace the newer fast reply. REFACTOR: snapshot the backend configuration
+per request; provider adapters and their API contracts remain unchanged. Settings
+preserve existing fast choices and leave thinking models explicitly unconfigured;
+ChatGPT choices come from the account catalogue. Think resets after submission.
+Full required regression: `QT_QPA_PLATFORM=offscreen uv run pytest` passed 166
+tests; `uv run ruff check` passed. Tests used authorized uv cache access. No live
+inference, paid APIs, audio, microphone capture or service changes performed.
+Manual Arch/Sway checks remain: verify account Fast/Thinking selectors and the
+Think checkbox fit the desktop, select available models, send fast → thinking →
+fast replies, and cancel a thinking reply. Live ChatGPT plan usage and separately
+billed API model/reasoning compatibility require operator checks; reasoning may
+need a larger output budget. Marked the completed item in the local ignored
+todo.md without adding that private backlog to version control.

@@ -47,6 +47,15 @@ class SettingsDialog(QDialog):
         self.fields = {}
         choices = {
             "reasoning_effort": ["default", "none", "minimal", "low", "medium", "high", "xhigh"],
+            "thinking_reasoning_effort": [
+                "default",
+                "none",
+                "minimal",
+                "low",
+                "medium",
+                "high",
+                "xhigh",
+            ],
             "ai_mode": ["chatgpt", "api"],
             "provider": ["piper", "elevenlabs"],
             "fallback": ["text", "piper"],
@@ -71,10 +80,17 @@ class SettingsDialog(QDialog):
                 field.setValue(value)
             else:
                 field = QLineEdit(value)
-                if key == "chatgpt_model":
+                if key in ("chatgpt_model", "chatgpt_thinking_model"):
                     field.setReadOnly(True)
             self.fields[key] = field
-            label = "API model" if key == "model" else key.replace("_", " ").capitalize()
+            label = {
+                "model": "API fast model",
+                "thinking_model": "API thinking model",
+                "reasoning_effort": "API fast reasoning effort",
+                "thinking_reasoning_effort": "API thinking reasoning effort",
+                "chatgpt_model": "ChatGPT fast model (account panel)",
+                "chatgpt_thinking_model": "ChatGPT thinking model (account panel)",
+            }.get(key, key.replace("_", " ").capitalize())
             form.addRow(label, field)
         browse = QPushButton("Choose installed Piper .onnx voice…")
         browse.clicked.connect(self.browse)

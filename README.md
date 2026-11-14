@@ -68,6 +68,19 @@ Support depends on the model. GPT-4.1 models should use `default`. Reasoning use
 output tokens too; increase the output budget or lower effort if no text is returned.
 The subscription adapter currently uses its model default reasoning.
 
+For quick chat and more deliberate replies, save separate **Fast** and **Thinking**
+models in the ChatGPT account panel. In API mode, configure **API fast model** and
+**API thinking model** in Settings, each with its own reasoning effort. Choose
+models appropriate to your account and task; Studio Buddy does not rank them.
+Existing model selections remain your fast choices. Thinking starts unconfigured.
+Check **Think · next message** before sending to use the thinking model once;
+the checkbox resets when a request is submitted. It also applies to the next
+voice transcript or coaching action if checked. Conversation, memory and session
+request budget are shared. An unconfigured thinking choice preserves your draft
+and asks you to choose a model. ChatGPT replies always use ChatGPT plan usage;
+the option never switches billing modes. A stronger model may take longer and
+consume more usage. API output limits also cover reasoning tokens.
+
 Type or paste into the message field and click Send or press **Ctrl+Enter**.
 Enter alone adds a newline. Replies stay short and suggest one experiment; the user
 judges taste. Voice transcripts follow the same conversation and memory path.
