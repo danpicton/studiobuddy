@@ -580,3 +580,31 @@ Manual checks remaining: Arch/Sway UI, choose both models and confirm realistic
 fast/direct versus complex/delegated replies, live ChatGPT plan/API compatibility,
 latency and judgment quality. Routing is model judgment, not a guaranteed quality
 classifier. API reasoning may require a larger output-token budget.
+
+## Replies written for listening and clean speech input
+RED (2026-11-14): `QT_QPA_PLATFORM=offscreen uv run pytest
+ tests/test_spoken_replies.py -q` produced 5 expected failures and 2 passes.
+Speech sends Markdown unchanged to the primary/fallback voices, and neither
+fast nor thinking requests gets voice-specific instructions. Tests cover headings,
+emphasis, inline code, links, table rows, musical sharps/negative gain, fenced code,
+formatting-only silence, both billing modes and preservation of displayed text.
+All model, synthesis and playback calls are mocked; no audio or microphone use.
+GREEN: all 21 focused spoken-reply/speech/handoff tests passed. Refactor: separate
+speech_text.py handles common Markdown before the existing 2,000-character speech
+limit; primary and fallback providers receive identical cleaned content. Voice
+instructions apply to both model snapshots only when voice mode is enabled;
+text/history retain original output. Routing markers and request budgets are
+unchanged. An initial focused run segfaulted during Qt cycle collection on a
+worker SDK import. The new GUI fixture explicitly closes its windows and collects
+cycles on Qt's owning thread; focused and full runs then passed.
+Regression: `QT_QPA_PLATFORM=offscreen uv run pytest` passed 177 tests;
+`uv run ruff check` passed after parenthesizing a multiline expected test string
+flagged on the first lint run. `git diff --check` passed. All synthesis, playback
+and model calls were mocked. No live audio, microphone or paid API tests run.
+Manual Arch/Sway checks remain: with Voice replies enabled, ask for a comparison
+and a deeper explanation, confirm both direct and delegated answers sound natural
+in Piper, cancel playback, and verify normal audio output. Cleanup handles common
+Markdown, not arbitrary code/maths narration; prompt compliance still needs live
+model verification. Operator-started microphone capture is not required for these
+checks; use typed messages. Service check before installation: app active, STT
+inactive. Only the app will be restarted to load the update.

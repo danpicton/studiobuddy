@@ -7,6 +7,8 @@ import tempfile
 from pathlib import Path
 from typing import Protocol
 
+from .speech_text import speech_text
+
 
 class SpeechError(Exception):
     pass
@@ -103,15 +105,18 @@ class Speech:
         await self.stop()
         if not self.voice:
             return
+        text = speech_text(text)[:2000]
+        if not text:
+            return
         generation = self.generation
         self.task = asyncio.current_task()
         try:
             try:
-                audio = await self.provider.generate(text[:2000])
+                audio = await self.provider.generate(text)
             except SpeechError:
                 if not self.fallback:
                     raise
-                audio = await self.fallback.generate(text[:2000])
+                audio = await self.fallback.generate(text)
             if generation == self.generation and self.voice:
                 await self.player.play(audio)
         finally:

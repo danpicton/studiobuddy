@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 from .ai import AIError, OpenAIBackend
 from .chatgpt_ai import ChatGPTBackend
+from .personality import VOICE_PROMPT
 
 HANDOFF = "[[STUDIO_BUDDY_HANDOFF]]"
 ROUTING_PROMPT = """
@@ -34,6 +35,9 @@ class ReplyTurn:
         if not isinstance(backend, OpenAIBackend):
             return cls(backend, None, messages, context)
         fast, strong = copy(backend), copy(backend)
+        if settings.voice_mode:
+            fast.instructions += VOICE_PROMPT
+            strong.instructions += VOICE_PROMPT
         if isinstance(backend, ChatGPTBackend):
             fast.model = settings.chatgpt_model
             strong.model = settings.chatgpt_thinking_model

@@ -120,6 +120,17 @@ generation. Providers can change in Settings without restarting. **Apply and Tes
 Voice** explicitly tests the selected provider, including while normal mode is Text.
 The button saves those settings. Cloud voice tests may incur charges.
 
+Voice replies are written for listening: both the fast and thinking models are
+asked for short, natural speech without Markdown, tables, lists or visual notation.
+Long explanations start with an overview and can continue in spoken steps.
+Before synthesis, a shared cleanup step removes common Markdown formatting,
+speaks link labels, turns table rows into labelled sentences and replaces fenced
+code with a short notice that it is available in the text reply. This applies to
+Piper, cloud voices and local fallback. The original reply stays in chat/history.
+Cleanup is a fallback for common formatting, not a full maths or code narrator;
+text mode keeps its usual response instructions. Speech input remains capped at
+2,000 characters after cleanup.
+
 Speech providers share cancellation and bounded audio buffering (20 MB cloud limit).
 Playback begins after generation completes; this release does not play partial audio
 chunks. Assistant text is sent externally only when the selected cloud provider is
