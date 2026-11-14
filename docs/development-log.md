@@ -608,3 +608,37 @@ Markdown, not arbitrary code/maths narration; prompt compliance still needs live
 model verification. Operator-started microphone capture is not required for these
 checks; use typed messages. Service check before installation: app active, STT
 inactive. Only the app will be restarted to load the update.
+
+## Simplify the conversation window and section settings
+RED (2026-11-14): `QT_QPA_PLATFORM=offscreen uv run pytest
+ tests/test_interface.py -q` failed all four tests as expected: missing icon
+controls and a persistent sectioned settings page. Tests specify chat-first row
+order, accessible rendered icons, account/model controls inside the scroll area,
+all existing preferences, saving live model choices without stale form values,
+reopening after voice changes, cancelled sign-in and project/session actions.
+No live account, audio, microphone or Renoise checks performed.
+GREEN: 18 focused interface/settings/account tests passed, including explicit
+Renoise icon reads. Updated the former voice-label assertion to check its tooltip;
+all main actions now have empty visible text, accessible names and rendered icons.
+Refactor: bundled IconButton handles palette-aware SVG rendering; SettingsDialog
+owns sectioned scroll content and reloads current preferences when reopened.
+Account operations remain asynchronous and model selections cannot be overwritten
+by stale form fields. Closing settings cancels sign-in and rejects stale results.
+Removed coaching/note/wrap-up controls and dead UI callbacks; stored data remains.
+Moved the creative goal into Settings and preserved project/session operations.
+Font Awesome Free 6.7.2 SVGs were downloaded from the official repository; CC BY
+4.0 attribution, original SVG comments and the upstream licence are bundled.
+Regression: `QT_QPA_PLATFORM=offscreen uv run pytest` passed 182 tests;
+`uv run ruff check` and `git diff --check` passed. Ruff initially flagged implicit
+string concatenation in settings information; explicit parentheses fixed it.
+`uv build --wheel --out-dir /tmp/studio-buddy-ui-dist` succeeded; ZIP inspection
+confirmed all nine icons, attribution and licence are included. Offscreen main
+and settings previews were visually inspected at 540x680 and 600x680. Preview
+shutdown initially timed out inside the sandbox: a socketpair probe confirmed
+EPERM on the asyncio wakeup socket. Authorized preview reruns shut down normally.
+No production worker/lifecycle change was needed. Tests and previews use mocked
+account/audio/Renoise services; no live inference, audio or microphone checks.
+Manual Arch/Sway checks remain for real scaling, focus, icon contrast in system
+theme, keyboard navigation, sign-in/browser/usage links, live Renoise reads and
+voice output. Service check before install: app active with zero restarts, STT
+inactive. Install/reopen only the app; microphone capture remains stopped.

@@ -94,7 +94,7 @@ def test_runtime_provider_settings(qtbot, tmp_path):
     qtbot.addWidget(window)
     window.apply_settings(Settings(provider="elevenlabs", eleven_voice="v", voice_mode=True))
     qtbot.waitUntil(lambda: isinstance(window.speech.provider, ElevenLabs))
-    assert "external" in window.voice.text()
+    assert "external" in window.voice.toolTip()
     assert window.voice.isChecked()
     window.apply_settings(Settings())
     qtbot.waitUntil(lambda: not window.speech.voice)

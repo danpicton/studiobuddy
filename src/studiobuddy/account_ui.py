@@ -2,7 +2,16 @@
 
 from PySide6.QtCore import Qt, QUrl, Signal
 from PySide6.QtGui import QDesktopServices
-from PySide6.QtWidgets import QComboBox, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
+from PySide6.QtWidgets import (
+    QComboBox,
+    QFormLayout,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QSizePolicy,
+    QVBoxLayout,
+    QWidget,
+)
 
 from .chatgpt_auth import AuthError
 from .runner import Runner
@@ -39,29 +48,39 @@ class AccountPanel(QWidget):
         self.cancel_button = QPushButton("Cancel sign-in")
         self.cancel_button.clicked.connect(self.cancel)
         for button in (self.connect_button, self.disconnect_button, self.cancel_button):
+            button.setAutoDefault(False)
             row.addWidget(button)
         layout.addLayout(row)
-        row = QHBoxLayout()
+        models_form = QFormLayout()
+        models_form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
         self.models = QComboBox()
         self.models.setPlaceholderText("Choose a ChatGPT model after signing in")
         self.models.currentIndexChanged.connect(self.select_model)
-        row.addWidget(QLabel("Fast"))
-        row.addWidget(self.models)
-        refresh = QPushButton("Refresh models")
-        refresh.clicked.connect(lambda: self.start("refresh"))
-        row.addWidget(refresh)
-        manage = QPushButton("Manage usage")
-        manage.clicked.connect(
-            lambda: QDesktopServices.openUrl(QUrl("https://chatgpt.com/settings/usage"))
-        )
-        row.addWidget(manage)
-        layout.addLayout(row)
-        row = QHBoxLayout()
-        row.addWidget(QLabel("Thinking"))
+        models_form.addRow("Fast", self.models)
         self.thinking_models = QComboBox()
         self.thinking_models.addItem("Choose a thinking model", "")
         self.thinking_models.currentIndexChanged.connect(self.select_thinking_model)
-        row.addWidget(self.thinking_models)
+        models_form.addRow("Thinking", self.thinking_models)
+        self.models.setAccessibleName("ChatGPT fast model")
+        self.thinking_models.setAccessibleName("ChatGPT thinking model")
+        layout.addLayout(models_form)
+        for models in (self.models, self.thinking_models):
+            models.setSizeAdjustPolicy(
+                QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon
+            )
+            models.setMinimumContentsLength(8)
+            models.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        row = QHBoxLayout()
+        self.refresh_button = QPushButton("Refresh models")
+        self.refresh_button.clicked.connect(lambda: self.start("refresh"))
+        self.manage_button = QPushButton("Manage usage")
+        self.manage_button.clicked.connect(
+            lambda: QDesktopServices.openUrl(QUrl("https://chatgpt.com/settings/usage"))
+        )
+        for button in (self.refresh_button, self.manage_button):
+            button.setAutoDefault(False)
+            row.addWidget(button)
+        row.addStretch()
         layout.addLayout(row)
 
     def select_model(self, index):

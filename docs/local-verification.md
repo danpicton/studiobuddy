@@ -4,6 +4,13 @@ Use a disposable musical session. No project edits should occur.
 
 1. Arch/Sway: install, launch, type, paste, Ctrl+Enter; confirm readable UI at your
    scale, app_id with `swaymsg -t get_tree`, focus/scratchpad bindings and no always-on-top.
+   Confirm the chat-first layout at your scale: heading, history, input, icon
+   controls, project/session row and Renoise/settings row. Tab through the icons,
+   check tooltips, and verify icon contrast with both dark and system themes.
+   Open the settings gear and scroll through every section; confirm sign-in,
+   models, refresh and usage are there, saved preferences survive reopening,
+   and closing settings cancels an unfinished sign-in. The speaker toggles reply
+   audio only; it must not start microphone capture.
 2. Existing PushTalk: focus input, hold/release existing F9, verify dictation and edit
    before sending. Verify its services/config/bindings are unchanged.
    Start the separate studio-buddy services and verify F10 while Renoise has focus:
@@ -19,8 +26,8 @@ Use a disposable musical session. No project edits should occur.
    Test cancel, lost-release watchdog, no
    speech, service restart and unavailable STT. Verify the chosen PipeWire mic.
    No microphone capture was run during development.
-3. ChatGPT: run the normal app, Continue with ChatGPT, approve plan usage, select
-   a discovered model and send one message. Verify account label, reply and token
+3. ChatGPT: open Settings, Continue with ChatGPT, approve plan usage, select
+   discovered Fast and Thinking models and send a message. Verify account label, reply and token
    count, restart persistence, refresh after token expiry, Cancel sign-in and Sign out.
    Verify the default browser returns to the loopback callback on Arch/Sway. Check
    Manage usage; confirm plan-limit failures never switch to API billing. Actual
@@ -37,8 +44,10 @@ Use a disposable musical session. No project edits should occur.
    Confirm Settings offers only Piper/ElevenLabs, and background startup preserves
    the saved Text/Voice mode. A legacy Hume selection should open in Text mode;
    other saved preferences should remain intact after saving Settings.
-6. Create two projects/sessions, record favourite/rejected ideas and outcomes, wrap up,
-   restart, edit/delete notes; verify isolation, restored goal/history and next-step context.
+6. Create two projects/sessions with the icons beside the bottom selectors. Edit
+   the creative goal in Settings, switch sessions and restart; verify isolated
+   histories and restored goals. Existing stored notes/summaries remain available
+   as model context; their former main-window action buttons have been removed.
 7. Renoise: first verify the exact tool's documentation and protocol. This build only
    supports MCP Streamable HTTP resources. Connect a compatible local read-only server,
    discover resources, select/read a bounded resource, send one chat message. Disconnect

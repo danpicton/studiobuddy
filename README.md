@@ -45,8 +45,10 @@ for automated tests. See [development evidence](docs/development-log.md).
 Run `uv run studio-buddy` from the checkout (or `studio-buddy` after tool installation).
 ChatGPT subscription mode is the default, including when loading an older config.
 
-Click **Continue with ChatGPT**, finish sign-in in your system browser, and approve
-ChatGPT plan usage for Studio Buddy. Return to the app and choose an available model.
+Open the gear icon for **Settings**, then **Continue with ChatGPT** in the
+ChatGPT account and models section. Finish sign-in in your system browser and
+approve ChatGPT plan usage for Studio Buddy. Choose your Fast and Thinking models
+in that same section.
 **Refresh models** reloads your account's catalogue; **Manage usage** opens ChatGPT's
 usage settings. Your account must be eligible for this preview and grant plan usage.
 The app does not use your Codex login or require an API key for subscription replies.
@@ -57,8 +59,8 @@ cannot be confirmed, the app tells you to disconnect it in ChatGPT Settings → 
 This personal desktop implementation keeps one account registration; reauthorization
 uses that same account. It does not offer multiple-account switching.
 
-For explicitly separate API billing, select **Ai mode: api** in Settings and set
-`OPENAI_API_KEY` securely in the launch environment. The **API model** field applies
+For explicitly separate API billing, select **AI billing mode: api** in Settings and set
+`OPENAI_API_KEY` securely in the launch environment. The **API fast model** field applies
 only to that mode. ChatGPT mode never falls back to API billing. Cloud speech providers
 remain separate paid services; Piper runs locally.
 
@@ -69,7 +71,7 @@ output tokens too; increase the output budget or lower effort if no text is retu
 The subscription adapter currently uses its model default reasoning.
 
 For automatic deeper thinking, save separate **Fast** and **Thinking** models
-in the ChatGPT account panel. In API mode, configure **API fast model** and
+in Settings's ChatGPT account section. In API mode, configure **API fast model** and
 **API thinking model** in Settings, each with its own reasoning effort. Choose
 models appropriate to your account and task; Studio Buddy does not rank them.
 Existing model selections remain your fast choices. Thinking starts unconfigured.
@@ -78,7 +80,7 @@ and can hand off complex questions to the thinking model. The thinking model get
 the same conversation, memory and one-request Renoise snapshot and supplies the
 final answer directly. Only that final answer is stored or spoken; there is no
 manual Think checkbox. Status changes to **Thinking more deeply…** on handoff.
-The next message starts with the fast model again. Voice and coaching requests
+The next message starts with the fast model again. Voice and typed requests
 use the same flow. With no thinking model configured, fast chat works normally.
 
 A handoff makes two model requests, both counted against the shared, persisted
@@ -88,16 +90,23 @@ message, stays in the selected billing mode, and stops on errors or cancellation
 Model judgment determines escalation and can be imperfect. Thinking may consume
 more usage and take longer; API output limits also cover reasoning tokens.
 
-Type or paste into the message field and click Send or press **Ctrl+Enter**.
+Type or paste into the message field and click the send icon or press **Ctrl+Enter**.
 Enter alone adds a newline. Replies stay short and suggest one experiment; the user
 judges taste. Voice transcripts follow the same conversation and memory path.
 
-Create/select projects and sessions at the top; edit the current goal beneath them.
-**I'm stuck** and **Another idea** request a next experiment. **Remember this** saves
-an explicitly confirmed note. **Notes** lets you categorize, edit and delete likes,
-experiments, rejections, outcomes, decisions and ideas to revisit. **Wrap up** saves
-a short manually edited summary and next step. No paid automatic summary request.
-Recent conversation, explicit notes and previous summaries accompany future replies.
+The main window contains a heading, conversation, message field, then icon controls
+for Send, Stop/cancel and Voice replies. The speaker button toggles spoken replies;
+it does not start microphone capture. Its checked state and tooltip show the mode.
+Project and session selectors sit below, each beside its new-item icon. The last
+row contains Renoise status, an observation selector, Connect, Read once and Settings
+icons. Hover an icon for its label; all buttons have accessible names and keyboard
+focus. The conversation expands with the window.
+
+Settings is a sectioned, scrollable page containing account/sign-in information,
+models and usage, voice providers, Renoise, appearance, the current session's
+creative goal and storage details. Existing settings are preserved. The main
+window no longer has coaching, note or wrap-up action buttons. Previously stored
+notes and session summaries remain in SQLite and accompany future replies.
 All messages remain in SQLite; only the latest 20 messages (4,000 characters each)
 and bounded context are sent. Selected Renoise observations reserve space within the
 12,000-character context budget before stored memories are trimmed. Old chat is not
@@ -329,7 +338,8 @@ Renoise support is optional; the default installation omits MCP dependencies.
 
 Start the server in Renoise via Tools → Renoise MCP. Enable MCP in Studio Buddy
 Settings, use ReMCP's default `http://localhost:19714/mcp` (or your configured
-endpoint), Save, then Connect. Select an observation and click **Read once**.
+endpoint), Save, then use the plug icon to Connect. Select an observation and use
+the download icon to **Read once**.
 Up to 8,000 text characters become untrusted context for the next AI request only.
 Refresh explicitly when the song changes. There is no background polling or AI
 access to tools. Only literal loopback/localhost HTTP endpoints are accepted,

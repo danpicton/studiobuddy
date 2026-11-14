@@ -3,7 +3,6 @@ import sys
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtWidgets import (
     QApplication,
-    QCheckBox,
     QComboBox,
     QHBoxLayout,
     QInputDialog,
@@ -11,7 +10,7 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QMainWindow,
     QPlainTextEdit,
-    QPushButton,
+    QSizePolicy,
     QTextBrowser,
     QVBoxLayout,
     QWidget,
@@ -21,7 +20,7 @@ from .account_ui import AccountPanel
 from .ai import AIError, MockAI, OpenAIBackend, compose_context
 from .chatgpt_ai import ChatGPTBackend
 from .chatgpt_auth import ChatGPTAuth
-from .memory_ui import NotesDialog
+from .icons import IconButton
 from .renoise import ContextError, Renoise
 from .routing import ReplyTurn
 from .runner import Runner
@@ -97,17 +96,22 @@ class Window(QMainWindow):
         body = QWidget()
         self.setCentralWidget(body)
         self.layout = QVBoxLayout(body)
-        self.layout.addWidget(QLabel("STUDIO BUDDY · a little company for your next loop"))
-        row = QHBoxLayout()
+        self.layout.setContentsMargins(20, 20, 20, 16)
+        self.layout.setSpacing(12)
+        self.heading = QLabel("Studio Buddy")
+        self.heading.setObjectName("heading")
+        self.layout.addWidget(self.heading)
         self.projects = QComboBox()
         self.sessions = QComboBox()
-        row.addWidget(self.projects)
-        row.addWidget(self.sessions)
-        for label, callback in [("+ Project", self.ask_project), ("+ Session", self.ask_session)]:
-            button = QPushButton(label)
-            button.clicked.connect(callback)
-            row.addWidget(button)
-        self.layout.addLayout(row)
+        for widget, label in ((self.projects, "Project"), (self.sessions, "Session")):
+            widget.setFixedHeight(36)
+            widget.setAccessibleName(label)
+            widget.setToolTip(label)
+            widget.setSizeAdjustPolicy(
+                QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon
+            )
+            widget.setMinimumContentsLength(8)
+            widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.projects.currentIndexChanged.connect(
             lambda i: self.select_project(self.projects.itemData(i)) if i >= 0 else None
         )
@@ -119,67 +123,62 @@ class Window(QMainWindow):
         self.goal.editingFinished.connect(
             lambda: self.store.update_goal(self.session_id, self.goal.text())
         )
-        self.layout.addWidget(self.goal)
         self.history = QTextBrowser()
-        self.layout.addWidget(self.history)
+        self.history.setAccessibleName("Conversation")
+        self.layout.addWidget(self.history, 1)
         self.input = MessageInput()
         self.input.setPlaceholderText(
             "What's making a good noise? Type here, or hold F10 for voice."
         )
         self.input.setMaximumHeight(110)
+        self.input.setAccessibleName("Message")
         self.layout.addWidget(self.input)
-        self.routing_status = QLabel("Fast replies · automatic thinking handoff when configured")
-        self.layout.addWidget(self.routing_status)
-        self.send = QPushButton("Send")
-        self.send.clicked.connect(self.send_message)
+        controls = QHBoxLayout()
+        self.send = IconButton("paper-plane", "Send message · Ctrl+Enter", self.send_message)
+        self.send.setObjectName("send")
         self.input.submitted.connect(self.send_message)
-        self.layout.addWidget(self.send)
-        self.voice = QCheckBox("Voice replies · Piper (local)")
+        self.stop = IconButton("stop", "Stop / cancel reply", self.cancel)
+        self.voice = IconButton("volume-high", "Voice replies", checkable=True)
         self.voice.toggled.connect(self.set_voice_mode)
-        self.layout.addWidget(self.voice)
-        self.stop = QPushButton("Stop / cancel")
-        self.stop.clicked.connect(self.cancel)
-        self.layout.addWidget(self.stop)
+        for button in (self.send, self.stop, self.voice):
+            controls.addWidget(button)
         self.status = StatusLabel("Ready")
-        self.layout.addWidget(self.status)
-        actions = QHBoxLayout()
-        for label, callback in [
-            (
-                "I'm stuck",
-                lambda: self.coach("I'm stuck. Suggest one small experiment with what we have."),
-            ),
-            (
-                "Another idea",
-                lambda: self.coach(
-                    "That direction isn't working. Suggest something meaningfully different."
-                ),
-            ),
-            ("Remember this", self.ask_remember),
-            ("Notes", self.show_notes),
-            ("Wrap up", self.wrap_up),
-        ]:
-            button = QPushButton(label)
-            button.clicked.connect(callback)
-            actions.addWidget(button)
-        self.layout.addLayout(actions)
+        self.status.setWordWrap(True)
+        controls.addSpacing(6)
+        controls.addWidget(self.status, 1)
+        self.layout.addLayout(controls)
+        project_row = QHBoxLayout()
+        self.new_project = IconButton("folder-plus", "New project", self.ask_project)
+        self.new_session = IconButton("file-circle-plus", "New session", self.ask_session)
+        project_row.addWidget(self.projects, 1)
+        project_row.addWidget(self.new_project)
+        project_row.addSpacing(8)
+        project_row.addWidget(self.sessions, 1)
+        project_row.addWidget(self.new_session)
+        self.layout.addLayout(project_row)
         context_row = QHBoxLayout()
         self.context_status = QLabel("Renoise · disconnected")
+        self.context_status.setWordWrap(True)
+        self.context_status.setMinimumWidth(90)
+        self.context_status.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         self.resources = QComboBox()
-        context_row.addWidget(self.context_status)
-        context_row.addWidget(self.resources)
-        for label, callback in [
-            ("Connect", self.connect_renoise),
-            ("Read once", self.read_context),
-        ]:
-            button = QPushButton(label)
-            button.clicked.connect(callback)
+        self.resources.setFixedHeight(36)
+        self.resources.setAccessibleName("Renoise observation")
+        self.resources.setToolTip("Choose a read-only Renoise observation")
+        self.resources.setSizeAdjustPolicy(
+            QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon
+        )
+        self.resources.setMinimumContentsLength(8)
+        context_row.addWidget(self.context_status, 1)
+        context_row.addWidget(self.resources, 1)
+        self.connect_button = IconButton("plug", "Connect to Renoise", self.connect_renoise)
+        self.read_button = IconButton("download", "Read Renoise once", self.read_context)
+        self.settings_button = IconButton("gear", "Settings", self.open_settings)
+        for button in (self.connect_button, self.read_button, self.settings_button):
             context_row.addWidget(button)
         self.layout.addLayout(context_row)
         self.refresh_selectors()
         self.select_session(self.session_id)
-        settings_button = QPushButton("Settings")
-        settings_button.clicked.connect(self.open_settings)
-        self.layout.addWidget(settings_button)
         if self.auth:
             self.account = AccountPanel(
                 self.auth,
@@ -190,8 +189,16 @@ class Window(QMainWindow):
             self.account.changing.connect(self.cancel)
             self.account.model_selected.connect(self.select_chatgpt_model)
             self.account.thinking_model_selected.connect(self.select_chatgpt_thinking_model)
-            self.layout.insertWidget(1, self.account)
         self.apply_settings(self.settings, save=False)
+        self.settings_dialog = SettingsDialog(
+            self.settings,
+            self.settings_path or "temporary test settings",
+            self.apply_settings,
+            self.test_voice,
+            self,
+            account=self.account,
+            session_goal=self.goal,
+        )
         if self.account and self.settings.ai_mode == "chatgpt":
             try:
                 connected = self.auth.account_label()
@@ -216,13 +223,8 @@ class Window(QMainWindow):
             self.settings.save(self.settings_path)
 
     def open_settings(self):
-        SettingsDialog(
-            self.settings,
-            self.settings_path or "temporary test settings",
-            self.apply_settings,
-            self.test_voice,
-            self,
-        ).exec()
+        self.settings_dialog.load_settings(self.settings)
+        self.settings_dialog.exec()
 
     def test_voice(self):
         async def test():
@@ -244,7 +246,7 @@ class Window(QMainWindow):
         settings.validate()
         if save and self.settings_path:
             settings.save(self.settings_path)
-        self.cancel()
+        self.cancel(update_status=save)
         self.context_token += 1
         self.renoise_context = ""
         self.resources.clear()
@@ -253,8 +255,6 @@ class Window(QMainWindow):
             self.ai = (
                 ChatGPTBackend(self.auth) if settings.ai_mode == "chatgpt" else OpenAIBackend()
             )
-        if self.account:
-            self.account.setVisible(settings.ai_mode == "chatgpt")
         if isinstance(self.ai, OpenAIBackend):
             self.ai.model = (
                 settings.chatgpt_model if isinstance(self.ai, ChatGPTBackend) else settings.model
@@ -268,11 +268,7 @@ class Window(QMainWindow):
         )
         self.voice.blockSignals(True)
         self.voice.setChecked(settings.voice_mode)
-        self.voice.setText(
-            "Voice replies · "
-            + settings.provider
-            + (" (external service)" if settings.provider != "piper" else " (local)")
-        )
+        self.update_voice_button()
         self.voice.blockSignals(False)
         self.speech_runner.submit(
             0,
@@ -283,13 +279,23 @@ class Window(QMainWindow):
             ),
         )
         self.setStyleSheet(
-            "QWidget { background: #20242b; color: #e3e7ec; font-size: 13px; } QPlainTextEdit, QTextBrowser, QLineEdit, QComboBox { background: #171a20; border: 1px solid #46515c; border-radius: 5px; padding: 7px; } QPushButton { background: #34434b; border: 1px solid #566772; border-radius: 5px; padding: 7px; } QPushButton:hover { background: #46615f; }"
+            "QWidget { background: #20242b; color: #e3e7ec; font-size: 13px; }"
+            "QLabel#heading { font-size: 23px; font-weight: 600; padding-bottom: 3px; }"
+            "QPlainTextEdit, QTextBrowser, QLineEdit, QComboBox { background: #171a20; border: 1px solid #46515c; border-radius: 6px; padding: 8px; }"
+            "QTextBrowser { border: none; padding: 12px; }"
+            "QPushButton { background: #34434b; border: 1px solid #566772; border-radius: 6px; padding: 7px; }"
+            "QPushButton:hover { background: #46615f; }"
+            "QPushButton:focus { border: 2px solid #b7a8ef; }"
+            "QPushButton:checked, QPushButton#send { background: #63528b; border-color: #9c87c8; }"
+            "QGroupBox { border: 1px solid #46515c; border-radius: 6px; margin-top: 12px; padding-top: 12px; }"
+            "QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 4px; }"
             if settings.theme == "dark"
             else ""
         )
 
     def set_voice_mode(self, enabled):
         self.settings.voice_mode = enabled
+        self.update_voice_button()
         if self.settings_path:
             self.settings.save(self.settings_path)
         self.speech_runner.submit(
@@ -299,6 +305,15 @@ class Window(QMainWindow):
                 self.settings.speech_provider(),
                 Piper(self.settings.piper_model) if self.settings.fallback == "piper" else None,
             ),
+        )
+
+    def update_voice_button(self):
+        self.voice.update_icon("volume-high" if self.settings.voice_mode else "volume-xmark")
+        self.voice.setToolTip(
+            ("Disable" if self.settings.voice_mode else "Enable")
+            + " voice replies · "
+            + self.settings.provider
+            + (" (local)" if self.settings.provider == "piper" else " (external service)")
         )
 
     def connect_renoise(self):
@@ -391,42 +406,9 @@ class Window(QMainWindow):
         if ok and goal.strip():
             self.create_session(goal.strip())
 
-    def coach(self, prompt):
-        self.input.setPlainText(prompt)
-        self.send_message()
-
     def remember_text(self, kind, text, outcome=""):
         self.store.remember(self.project_id, kind, text, outcome)
         self.status.setText("Remembered for this project.")
-
-    def ask_remember(self):
-        default = self.input.toPlainText() or (
-            self.messages[-1]["content"] if self.messages else ""
-        )
-        text, ok = QInputDialog.getMultiLineText(
-            self, "Remember this", "Idea, preference or decision", default
-        )
-        if ok and text.strip():
-            self.remember_text("decision", text.strip())
-
-    def show_notes(self):
-        NotesDialog(self.store, self.project_id, self).exec()
-
-    def wrap_up(self):
-        current = next(
-            s for s in self.store.sessions(self.project_id) if s["id"] == self.session_id
-        )
-        summary, ok = QInputDialog.getMultiLineText(
-            self, "Session summary", "What is worth keeping?", current["summary"]
-        )
-        if not ok:
-            return
-        next_step, ok = QInputDialog.getText(
-            self, "Next time", "One next experiment", text=current["next_step"]
-        )
-        if ok:
-            self.store.summarize(self.session_id, summary[:2000], next_step[:1000])
-            self.status.setText("Session summary saved.")
 
     def render(self):
         self.history.setPlainText(
